@@ -16,8 +16,8 @@
 │                                                                               │
 │  index.html ──▶ assets/app.js ──fetch──▶ data/imoveis.json                    │
 │                     │                                                         │
-│                     ├── assets/anotacoes.js ◀──▶ localStorage                 │
-│                     │        └──merge boot──▶ data/anotacoes.json (backup)    │
+│                     ├── assets/anotacoes.js ◀──▶ localStorage (só local!)     │
+│                     │        └── export/import manual de JSON (ADR-008)       │
 │                     └── assets/excel.js ──▶ .xlsx (SheetJS vendorizado)       │
 │                                                                               │
 └───────────────────────────────────────────────────────────────────────────────┘
@@ -32,13 +32,13 @@
 
 ### Dados (`data/`)
 - `imoveis.json` — **escrito apenas pelo scraper**. Sobrescrito por completo a cada execução; histórico via git.
-- `anotacoes.json` — **escrito apenas pelo usuário** (export do dashboard, commitado manualmente). Dicionário `{id do imóvel: anotação}`.
+- Anotações do usuário — **somente no localStorage do navegador** (dicionário `{id do imóvel: anotação}`), com export/import manual de JSON guardado localmente. **Nunca commitadas: o repo e o Pages são públicos (ADR-008).** `data/anotacoes.example.json` documenta o formato com dados fictícios; `data/anotacoes.json` está no `.gitignore`.
 - As duas camadas se unem pelo `id` (`{fonte}-{código do anúncio}`), estável entre execuções.
 
 ### Dashboard (raiz + `assets/`)
 - `index.html` — layout: KPIs, barra de filtros, tabela, scatter, painel de detalhe/edição.
 - `app.js` — estado dos filtros, ordenação, render da tabela e do scatter SVG.
-- `anotacoes.js` — camada de persistência: lê `data/anotacoes.json`, mescla com `localStorage` (campo `atualizado_em` mais recente vence), salva edições, exporta/importa JSON.
+- `anotacoes.js` — camada de persistência: localStorage sanitizado (score 0-5, boolean estrito, `atualizado_em` validado com `Date.parse` e normalizado para ISO), merge por timestamp mais recente, export/import de JSON. Degrada para memória quando o navegador nega escrita.
 - `excel.js` — monta planilha com as linhas filtradas + colunas de anotação e dispara download `.xlsx`.
 - `vendor/xlsx.min.js` — SheetJS vendorizado (única dependência JS).
 

@@ -20,7 +20,8 @@ scraper/run.py  ──gera──▶  data/imoveis.json  ──fetch──▶  in
 - **Sem backend, sem build step, sem framework.** O dashboard é HTML/CSS/JS puro que qualquer agente consegue revisar. Não introduzir React/bundlers/CDNs — dependências JS são vendorizadas em `assets/vendor/`.
 - **Duas camadas de dados independentes**, unidas pelo `id` do imóvel:
   - `data/imoveis.json` — só o scraper escreve. Envelope `{"atualizado_em", "imoveis": [...]}`.
-  - `data/anotacoes.json` + localStorage — só o usuário escreve (via dashboard). **O scraper nunca toca em anotações.**
+  - Anotações do usuário — **somente localStorage** + export/import manual (ADR-008). **O scraper nunca toca em anotações.**
+- **PRIVACIDADE (ADR-008): o repo e o Pages são públicos.** Anotações pessoais (endereço, comentários, score, visitado) **nunca podem ser commitadas** — `data/anotacoes.json` está no `.gitignore` e não existe fetch dele no código. Não criar nenhum fluxo que incentive commitar esses dados; só `data/anotacoes.example.json` (fictício) é versionado.
 - Schema do imóvel validado por Pydantic em `scraper/models.py`. `id` = `{fonte}-{código do anúncio}` (estável entre execuções).
 
 ## Comandos
@@ -29,6 +30,11 @@ scraper/run.py  ──gera──▶  data/imoveis.json  ──fetch──▶  in
 # atualizar dados
 cd scraper && pip install -r requirements.txt && playwright install chromium
 python run.py
+python validate_data.py       # relatório de qualidade + validação (CI roda o mesmo)
+
+# testes
+python -m unittest discover tests          # em scraper/
+node tests/js/anotacoes.test.js            # na raiz
 
 # dashboard local
 python -m http.server 8000   # na raiz do repo

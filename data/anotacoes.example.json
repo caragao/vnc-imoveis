@@ -1,0 +1,10 @@
+{
+  "__comentario": "EXEMPLO FICTÍCIO do formato de backup de anotações (gerado pelo botão 'Exportar anotações' do dashboard). Anotações reais são pessoais e NUNCA devem ser commitadas — o repositório e o GitHub Pages são públicos (ADR-008). Guarde seu backup localmente e restaure com 'Importar anotações'.",
+  "fonte-000000": {
+    "endereco_completo": "Rua Exemplo, 123 - apto 45 (fictício)",
+    "comentario": "Exemplo de comentário de visita. Dados inventados.",
+    "score": 4,
+    "visitado": true,
+    "atualizado_em": "2026-01-01T12:00:00.000Z"
+  }
+}
