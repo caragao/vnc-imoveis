@@ -14,21 +14,22 @@ API = "https://api.ph15.com"
 ID_CIDADE_SP = "3"
 ID_BAIRRO_VNC = "5"
 
-# fallback caso a extração da home falhe (chave pública embutida na página)
-FALLBACK_CREDS = {"apiKey": "blg595lddkgm4v9o78uks0cg7f", "chaveIndicacao": "JU9U-NA"}
-
-
 def _credenciais() -> dict:
-    """A home embute PARAMETROS = { apiUrl, apiKey, chaveIndicacao } em <script>."""
-    try:
-        html = http_get(SITE + "/", accept="text/html")
-        api_key = re.search(r'"apiKey"\s*:\s*"([^"]+)"', html)
-        chave = re.search(r'"chaveIndicacao"\s*:\s*"([^"]+)"', html)
-        if api_key and chave:
-            return {"apiKey": api_key.group(1), "chaveIndicacao": chave.group(1)}
-    except Exception as e:
-        print(f"[ph15] aviso: falha ao extrair credenciais da home ({e}), usando fallback")
-    return FALLBACK_CREDS
+    """A home embute PARAMETROS = { apiUrl, apiKey, chaveIndicacao } em <script>.
+
+    Sem fallback hardcoded: se a extração falhar, a fonte falha explicitamente
+    (run.py registra em fontes_com_falha e segue com as demais). Uma credencial
+    antiga mascarando o problema seria pior que a falha visível.
+    """
+    html = http_get(SITE + "/", accept="text/html")
+    api_key = re.search(r'"apiKey"\s*:\s*"([^"]+)"', html)
+    chave = re.search(r'"chaveIndicacao"\s*:\s*"([^"]+)"', html)
+    if not api_key or not chave:
+        raise RuntimeError(
+            "ph15: não encontrei apiKey/chaveIndicacao no bloco PARAMETROS da home — "
+            "o site mudou; ver docs/SCRAPERS.md (seção ph15.com)"
+        )
+    return {"apiKey": api_key.group(1), "chaveIndicacao": chave.group(1)}
 
 
 def coletar() -> list[Imovel]:
