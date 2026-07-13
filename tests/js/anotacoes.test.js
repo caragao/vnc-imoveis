@@ -102,5 +102,19 @@ const arquivoFake = (obj) => ({ text: () => Promise.resolve(typeof obj === "stri
     assert.strictEqual(A.persistiu(), false, "persistiu() reporta falha de escrita");
   }
 
-  console.log("anotacoes.test.js: 5 grupos de teste OK");
+  // 6. duas abas: salvar em aba com cache velho não pode apagar anotação da outra
+  {
+    const ls = lsFuncional();
+    const abaA = carregarModulo(ls);
+    const abaB = carregarModulo(ls); // mesmo storage compartilhado
+    await abaA.carregar();
+    await abaB.carregar(); // B boota antes de A escrever
+    abaA.salvar("a", { comentario: "da aba A" });
+    abaB.salvar("b", { comentario: "da aba B" }); // cache de B não tinha "a"
+    const gravado = JSON.parse(ls.getItem("vnc-imoveis:anotacoes"));
+    assert.strictEqual(gravado.a?.comentario, "da aba A", "anotação da aba A sobrevive");
+    assert.strictEqual(gravado.b?.comentario, "da aba B", "anotação da aba B gravada");
+  }
+
+  console.log("anotacoes.test.js: 6 grupos de teste OK");
 })().catch((e) => { console.error(e); process.exit(1); });

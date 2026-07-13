@@ -76,7 +76,15 @@ const Anotacoes = (() => {
     return cache[id] || { endereco_completo: "", comentario: "", score: 0, visitado: false };
   }
 
+  function _sincronizar() {
+    // outra aba pode ter escrito depois do nosso boot — re-mescla o storage
+    // atual (timestamp mais recente vence) antes de qualquer escrita, para
+    // _persistir() nunca sobrescrever anotações alheias com cache velho
+    cache = _mesclar(cache, _lerLocal());
+  }
+
   function salvar(id, campos) {
+    _sincronizar();
     cache[id] = { ...obter(id), ...campos, atualizado_em: new Date().toISOString() };
     _persistir();
     return cache[id];
@@ -85,6 +93,7 @@ const Anotacoes = (() => {
   function todas() { return cache; }
 
   function exportar() {
+    _sincronizar(); // backup sempre com a visão mais completa entre abas
     const blob = new Blob([JSON.stringify(cache, null, 1)], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -99,6 +108,7 @@ const Anotacoes = (() => {
       if (typeof dados !== "object" || Array.isArray(dados)) {
         throw new Error("formato inválido: esperado objeto {id: anotação}");
       }
+      _sincronizar();
       cache = _mesclar(cache, dados);
       _persistir();
       return Object.keys(dados).length;
