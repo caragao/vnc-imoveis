@@ -15,8 +15,8 @@ const fmtM2 = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 });
 const estado = {
   imoveis: [],
   ordenacao: { col: "preco_m2", asc: true },
-  // fase 4 pluga aqui: anotacoes por id
   anotacoes: {},
+  editando: null, // id do imóvel com painel de edição aberto
 };
 
 // ---------- boot ----------
@@ -24,6 +24,7 @@ async function boot() {
   const resp = await fetch("data/imoveis.json");
   const dados = await resp.json();
   estado.imoveis = dados.imoveis;
+  estado.anotacoes = await Anotacoes.carregar();
   const dt = new Date(dados.atualizado_em);
   document.getElementById("atualizado-em").textContent =
     "dados de " + dt.toLocaleDateString("pt-BR") + " " +
@@ -40,8 +41,30 @@ async function boot() {
 
   ligarFiltros();
   ligarOrdenacao();
+  ligarAcoes();
   render();
   document.dispatchEvent(new CustomEvent("dashboard:pronto"));
+}
+
+// ---------- ações do topo (excel / export / import) ----------
+function ligarAcoes() {
+  document.getElementById("btn-excel").addEventListener("click", () =>
+    baixarExcel(ordenar(filtrar()), Anotacoes.todas())
+  );
+  document.getElementById("btn-exportar").addEventListener("click", () => Anotacoes.exportar());
+  document.getElementById("input-importar").addEventListener("change", async (ev) => {
+    const arq = ev.target.files[0];
+    if (!arq) return;
+    try {
+      const n = await Anotacoes.importar(arq);
+      estado.anotacoes = Anotacoes.todas();
+      render();
+      alert(`${n} anotações importadas e mescladas.`);
+    } catch (e) {
+      alert("Falha ao importar: " + e.message);
+    }
+    ev.target.value = "";
+  });
 }
 
 // ---------- filtros ----------
@@ -60,13 +83,19 @@ function filtrosAtuais() {
     pm2Max: valNum("f-pm2-max") !== null ? valNum("f-pm2-max") * 1000 : null,
     suitesMin: valNum("f-suites"),
     tipo: document.getElementById("f-tipo").value || null,
+    scoreMin: valNum("f-score"),
+    visitado: document.getElementById("f-visitado").value || null,
     fontes,
   };
 }
 
-// fase 4 substitui/estende este hook para filtrar por score/visitado
-let filtroExtra = () => true;
-function definirFiltroExtra(fn) { filtroExtra = fn; }
+function filtroExtra(im, f) {
+  const a = estado.anotacoes[im.id];
+  if (f.scoreMin !== null && (a?.score || 0) < f.scoreMin) return false;
+  if (f.visitado === "sim" && !a?.visitado) return false;
+  if (f.visitado === "nao" && a?.visitado) return false;
+  return true;
+}
 
 function filtrar() {
   const f = filtrosAtuais();
@@ -80,7 +109,7 @@ function filtrar() {
     (f.pm2Min === null || i.preco_m2 >= f.pm2Min) &&
     (f.pm2Max === null || i.preco_m2 <= f.pm2Max) &&
     (f.suitesMin === null || (i.suites ?? 0) >= f.suitesMin) &&
-    filtroExtra(i)
+    filtroExtra(i, f)
   );
 }
 
@@ -93,6 +122,8 @@ function ligarFiltros() {
     document.querySelectorAll("#f-fontes input").forEach((el) => (el.checked = true));
     document.getElementById("f-suites").value = "";
     document.getElementById("f-tipo").value = "";
+    document.getElementById("f-score").value = "";
+    document.getElementById("f-visitado").value = "";
     document.dispatchEvent(new CustomEvent("dashboard:limpar"));
     render();
   });
@@ -243,8 +274,9 @@ function ligarOrdenacao() {
 function ordenar(vis) {
   const { col, asc } = estado.ordenacao;
   const dir = asc ? 1 : -1;
+  const valor = (im) => col === "_score" ? (estado.anotacoes[im.id]?.score || 0) : im[col];
   return [...vis].sort((a, b) => {
-    const va = a[col], vb = b[col];
+    const va = valor(a), vb = valor(b);
     if (va == null && vb == null) return 0;
     if (va == null) return 1;
     if (vb == null) return -1;
@@ -264,23 +296,103 @@ function renderTabela(vis) {
         ? ` <span class="seta">${estado.ordenacao.asc ? "▲" : "▼"}</span>` : "");
   });
 
-  corpo.innerHTML = ordenados.map((im) => `
-    <tr data-id="${escapeHtml(im.id)}">
+  corpo.innerHTML = ordenados.map((im) => {
+    const a = estado.anotacoes[im.id];
+    const linha = `
+    <tr data-id="${escapeHtml(im.id)}"${a?.visitado ? ' class="visitado"' : ""}>
       <td><span class="fonte-tag"><span class="dot" style="background:${FONTES[im.fonte].cor}"></span>${FONTES[im.fonte].rotulo}</span></td>
       <td>${escapeHtml(im.tipo)}</td>
-      <td class="col-titulo"><a class="titulo-link" href="${escapeHtml(im.url)}" target="_blank" rel="noopener">${escapeHtml(im.titulo)}</a>${im.endereco ? `<br><span class="rodape">${escapeHtml(im.endereco)}</span>` : ""}</td>
+      <td class="col-titulo"><a class="titulo-link" href="${escapeHtml(im.url)}" target="_blank" rel="noopener">${escapeHtml(im.titulo)}</a>${im.endereco ? `<br><span class="rodape">${escapeHtml(im.endereco)}</span>` : ""}${a?.endereco_completo ? `<br><span class="rodape">📍 ${escapeHtml(a.endereco_completo)}</span>` : ""}${a?.comentario ? `<br><span class="rodape comentario">💬 ${escapeHtml(a.comentario)}</span>` : ""}</td>
       <td class="num">${fmtM2.format(im.area_util_m2)}</td>
       <td class="num">${fmtBRL.format(im.preco)}</td>
       <td class="num">${fmtBRL.format(im.preco_m2)}</td>
       <td class="num">${im.dormitorios ?? "—"}</td>
       <td class="num">${im.suites ?? "—"}</td>
       <td class="num">${im.vagas ?? "—"}</td>
+      <td class="col-score"><button type="button" class="score-btn" data-editar="${escapeHtml(im.id)}" title="Anotar este imóvel">${estrelas(a?.score || 0)}${a?.visitado ? ' <span class="check">✓</span>' : ""}</button></td>
       <td><a class="abrir" href="${escapeHtml(im.url)}" target="_blank" rel="noopener">abrir ↗</a></td>
-    </tr>`).join("");
+    </tr>`;
+    return estado.editando === im.id ? linha + linhaEditor(im) : linha;
+  }).join("");
+
+  corpo.querySelectorAll("[data-editar]").forEach((btn) =>
+    btn.addEventListener("click", () => {
+      estado.editando = estado.editando === btn.dataset.editar ? null : btn.dataset.editar;
+      render();
+    })
+  );
+  ligarEditor(corpo);
 
   document.getElementById("rodape").textContent =
     `${vis.length} imóveis exibidos · ordenado por ${estado.ordenacao.col.replace("_", " ")} ` +
     `(${estado.ordenacao.asc ? "crescente" : "decrescente"})`;
+}
+
+// ---------- editor de anotações ----------
+function estrelas(n) {
+  let s = "";
+  for (let i = 1; i <= 5; i++) s += i <= n ? "★" : "☆";
+  return `<span class="estrelas" aria-label="score ${n} de 5">${s}</span>`;
+}
+
+function linhaEditor(im) {
+  const a = Anotacoes.obter(im.id);
+  const estrelasEdit = [1, 2, 3, 4, 5].map((n) =>
+    `<button type="button" class="estrela-btn${n <= (a.score || 0) ? " ativa" : ""}" data-score="${n}" aria-label="score ${n}">★</button>`
+  ).join("");
+  return `
+    <tr class="linha-editor" data-editor-de="${escapeHtml(im.id)}">
+      <td colspan="11">
+        <div class="editor">
+          <div class="editor-campo">
+            <label>Endereço completo</label>
+            <input type="text" id="ed-endereco" value="${escapeHtml(a.endereco_completo || "")}" placeholder="Rua, número, apto...">
+          </div>
+          <div class="editor-campo editor-comentario">
+            <label>Comentário</label>
+            <textarea id="ed-comentario" rows="2" placeholder="Impressões da visita, condomínio, sol, reforma...">${escapeHtml(a.comentario || "")}</textarea>
+          </div>
+          <div class="editor-campo">
+            <label>Score</label>
+            <div class="estrelas-edit">${estrelasEdit}<button type="button" class="estrela-limpar" data-score="0" title="limpar score">×</button></div>
+          </div>
+          <div class="editor-campo">
+            <label>Visitado</label>
+            <label class="visitado-chk"><input type="checkbox" id="ed-visitado"${a.visitado ? " checked" : ""}> já visitei</label>
+          </div>
+          <div class="editor-campo editor-status">
+            <span class="rodape" id="ed-status">salvo automaticamente no navegador</span>
+            <button type="button" class="acao" id="ed-fechar">fechar</button>
+          </div>
+        </div>
+      </td>
+    </tr>`;
+}
+
+function ligarEditor(corpo) {
+  const linha = corpo.querySelector(".linha-editor");
+  if (!linha) return;
+  const id = linha.dataset.editorDe;
+  const salvar = (campos) => {
+    Anotacoes.salvar(id, campos);
+    estado.anotacoes = Anotacoes.todas();
+    linha.querySelector("#ed-status").textContent =
+      "salvo às " + new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  };
+  linha.querySelector("#ed-endereco").addEventListener("input", (e) => salvar({ endereco_completo: e.target.value }));
+  linha.querySelector("#ed-comentario").addEventListener("input", (e) => salvar({ comentario: e.target.value }));
+  linha.querySelector("#ed-visitado").addEventListener("change", (e) => { salvar({ visitado: e.target.checked }); render(); });
+  linha.querySelectorAll("[data-score]").forEach((b) =>
+    b.addEventListener("click", () => {
+      salvar({ score: Number(b.dataset.score) });
+      render(); // re-render para refletir estrelas na linha e no editor
+      // reabre foco visual no editor
+    })
+  );
+  linha.querySelector("#ed-fechar").addEventListener("click", () => {
+    estado.editando = null;
+    render();
+  });
 }
 
 // ---------- util ----------

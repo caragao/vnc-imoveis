@@ -13,7 +13,12 @@
     <h1>Imóveis à venda · Vila Nova Conceição</h1>
     <p class="sub">Anglo Americana · VNC · PH15 — <span id="atualizado-em"></span></p>
   </div>
-  <div class="topo-acoes" id="topo-acoes"><!-- fase 4: export/import/excel --></div>
+  <div class="topo-acoes" id="topo-acoes">
+    <button class="acao acao-primaria" id="btn-excel" type="button">⬇ Baixar Excel</button>
+    <button class="acao" id="btn-exportar" type="button">Exportar anotações</button>
+    <label class="acao" for="input-importar">Importar anotações</label>
+    <input type="file" id="input-importar" accept=".json,application/json" hidden>
+  </div>
 </header>
 
 <section class="filtros" aria-label="Filtros">
@@ -63,7 +68,25 @@
       <label class="fonte-chk"><input type="checkbox" value="ph15" checked><span class="dot dot-ph15"></span>PH15</label>
     </div>
   </div>
-  <div class="filtro filtro-extra" id="filtro-extra"><!-- fase 4: score/visitado --></div>
+  <div class="filtro">
+    <label for="f-score">Score</label>
+    <select id="f-score">
+      <option value="">todos</option>
+      <option value="1">★ 1+</option>
+      <option value="2">★ 2+</option>
+      <option value="3">★ 3+</option>
+      <option value="4">★ 4+</option>
+      <option value="5">★ 5</option>
+    </select>
+  </div>
+  <div class="filtro">
+    <label for="f-visitado">Visita</label>
+    <select id="f-visitado">
+      <option value="">todos</option>
+      <option value="sim">visitados</option>
+      <option value="nao">não visitados</option>
+    </select>
+  </div>
   <button class="limpar" id="btn-limpar" type="button">Limpar filtros</button>
 </section>
 
@@ -89,6 +112,7 @@
         <th data-col="dormitorios" class="num">Dorm.</th>
         <th data-col="suites" class="num">Suítes</th>
         <th data-col="vagas" class="num">Vagas</th>
+        <th data-col="_score">Score</th>
         <th data-col="_link"></th>
       </tr>
     </thead>
@@ -99,6 +123,9 @@
 
 <div class="tooltip" id="tooltip" hidden></div>
 
+<script src="assets/vendor/xlsx.min.js"></script>
+<script src="assets/anotacoes.js"></script>
+<script src="assets/excel.js"></script>
 <script src="assets/app.js"></script>
 </body>
 </html>

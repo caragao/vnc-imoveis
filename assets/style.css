@@ -46,7 +46,14 @@ body {
 }
 .topo h1 { margin: 0; font-size: 20px; font-weight: 650; }
 .sub { margin: 2px 0 0; color: var(--ink-2); font-size: 13px; }
-.topo-acoes { display: flex; gap: 8px; flex-wrap: wrap; }
+.topo-acoes { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.acao {
+  padding: 7px 14px;
+  border: 1px solid var(--baseline); border-radius: 999px;
+  background: none; color: var(--ink-2); font: inherit; font-size: 13px; cursor: pointer;
+}
+.acao:hover { background: var(--hover-wash); }
+.acao-primaria { border-color: var(--serie-anglo); color: var(--serie-anglo); font-weight: 600; }
 
 /* ---------- filtros: uma linha acima dos gráficos ---------- */
 .filtros {
@@ -138,6 +145,42 @@ td .titulo-link:hover { text-decoration: underline; }
 }
 .abrir:hover { background: var(--hover-wash); }
 .rodape { color: var(--muted); font-size: 12px; }
+
+/* ---------- anotações ---------- */
+.col-score { white-space: nowrap; }
+.score-btn {
+  background: none; border: none; cursor: pointer; padding: 2px 4px;
+  font: inherit; color: var(--ink-2); border-radius: 6px;
+}
+.score-btn:hover { background: var(--hover-wash); }
+.estrelas { letter-spacing: 1px; color: var(--ink-2); }
+.check { color: var(--serie-vnc); font-weight: 700; }
+tr.visitado .titulo-link::after { content: " ✓"; color: var(--serie-vnc); }
+.comentario { font-style: italic; }
+
+.linha-editor > td { background: var(--plane); padding: 12px 16px; }
+.editor { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: flex-end; }
+.editor-campo label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.editor input[type="text"], .editor textarea {
+  padding: 6px 8px; border: 1px solid var(--baseline); border-radius: 6px;
+  background: var(--surface-1); color: var(--ink-1); font: inherit; font-size: 13px;
+  min-width: 240px;
+}
+.editor-comentario { flex: 1 1 320px; }
+.editor-comentario textarea { width: 100%; resize: vertical; }
+.estrelas-edit { display: flex; align-items: center; gap: 2px; }
+.estrela-btn {
+  background: none; border: none; cursor: pointer; padding: 0 2px;
+  font-size: 22px; line-height: 1; color: var(--baseline);
+}
+.estrela-btn.ativa { color: var(--serie-ph15); }
+.estrela-btn:hover { transform: scale(1.15); }
+.estrela-limpar {
+  background: none; border: none; cursor: pointer; color: var(--muted);
+  font-size: 16px; padding: 0 4px;
+}
+.visitado-chk { display: flex !important; align-items: center; gap: 6px; font-size: 13px !important; color: var(--ink-2) !important; cursor: pointer; }
+.editor-status { display: flex; align-items: center; gap: 10px; margin-left: auto; }
 
 /* ---------- tooltip ---------- */
 .tooltip {
