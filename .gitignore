@@ -16,3 +16,6 @@ Thumbs.db
 # scratch
 *.log
 tmp/
+
+# anotações pessoais NUNCA são commitadas (repo público — ADR-008)
+data/anotacoes.json

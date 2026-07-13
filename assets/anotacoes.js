@@ -1,6 +1,8 @@
-/* Camada de anotações do usuário (ADR-006).
-   Fonte da verdade no navegador: localStorage. Backup/seed: data/anotacoes.json
-   (commitado manualmente). Merge no boot: atualizado_em mais recente vence.
+/* Camada de anotações do usuário (ADR-006, revisado pelo ADR-008).
+   Fonte da verdade: localStorage do navegador. Backup: SOMENTE export/import
+   manual de JSON, guardado localmente pelo usuário — o repo e o GitHub Pages
+   são PÚBLICOS, então anotações pessoais (endereço, comentários, score) nunca
+   são commitadas nem buscadas do repositório.
    O scraper NUNCA lê nem escreve estes dados. */
 "use strict";
 
@@ -27,16 +29,24 @@ const Anotacoes = (() => {
     return persistindo;
   }
 
+  function _normalizarData(v) {
+    // aceita qualquer formato que Date.parse entenda e normaliza para ISO UTC;
+    // inválido vira "" (perde qualquer disputa de merge) — nunca comparar
+    // lexicalmente string de data não validada
+    const t = Date.parse(v);
+    return Number.isNaN(t) ? "" : new Date(t).toISOString();
+  }
+
   function _sanitizar(anot) {
-    // dados podem vir de JSON externo (repo/import) — normaliza tipos antes de
-    // qualquer uso: score inteiro 0-5, strings de fato strings, boolean de fato boolean
+    // dados podem vir de JSON externo (import/localStorage adulterado) —
+    // normaliza tipos antes de qualquer uso
     if (typeof anot !== "object" || anot === null) return null;
     return {
       endereco_completo: String(anot.endereco_completo ?? ""),
       comentario: String(anot.comentario ?? ""),
       score: Math.max(0, Math.min(5, Math.trunc(Number(anot.score) || 0))),
       visitado: anot.visitado === true,
-      atualizado_em: String(anot.atualizado_em ?? ""),
+      atualizado_em: _normalizarData(anot.atualizado_em),
     };
   }
 
@@ -55,13 +65,9 @@ const Anotacoes = (() => {
   }
 
   async function carregar() {
-    let doRepo = {};
-    try {
-      const r = await fetch("data/anotacoes.json", { cache: "no-store" });
-      if (r.ok) doRepo = await r.json();
-    } catch { /* offline ou arquivo ausente: segue só com localStorage */ }
-    // duas passadas para sanitizar os DOIS lados (repo e localStorage)
-    cache = _mesclar(_mesclar({}, doRepo), _lerLocal());
+    // ADR-008: nada é buscado do repositório (público). Só localStorage,
+    // sanitizado porque pode ter sido escrito por versões antigas
+    cache = _mesclar({}, _lerLocal());
     _persistir();
     return cache;
   }

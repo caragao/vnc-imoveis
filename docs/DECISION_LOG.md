@@ -91,4 +91,17 @@ Formato de cada entrada: **Contexto → Decisão → Alternativas rejeitadas →
 
 **Alternativas rejeitadas:** CSV (problemas de encoding/separador); export server-side (não há servidor).
 
-**Consequências:** ~800 KB de lib vendorizada no repo; export sempre reflete o filtro atual.
+**Consequências:** ~280 KB de lib vendorizada no repo (build mini; rastreabilidade em `assets/vendor/README.md`); export sempre reflete o filtro atual.
+
+---
+
+## ADR-008 — Anotações pessoais nunca são commitadas (privacidade em repo público)
+**Data:** 2026-07-13 · **Status:** aceito · **Revisa parcialmente o ADR-006**
+
+**Contexto:** review de CTO apontou que o repositório e o GitHub Pages são **públicos**. O fluxo do ADR-006 sugeria commitar `data/anotacoes.json` como backup — isso publicaria endereço completo, comentários de visita, score e status de visita do usuário na internet.
+
+**Decisão:** anotações vivem **exclusivamente no localStorage** do navegador. Backup é **somente** export/import manual de JSON, guardado localmente pelo usuário (fora do repo). O dashboard não faz mais `fetch` de `data/anotacoes.json`; o arquivo saiu do repo e está no `.gitignore`; existe apenas `data/anotacoes.example.json` com dados fictícios para documentar o formato.
+
+**Alternativas rejeitadas:** repo privado (perderia GitHub Pages gratuito e a facilidade de compartilhar o dashboard); criptografar anotações no repo (complexidade e gestão de chave — fora do escopo).
+
+**Consequências:** sincronização entre dispositivos é 100% manual (exportar → transferir por canal privado → importar). Perda do navegador sem backup exportado = perda das anotações; o dashboard avisa quando o armazenamento não persiste.

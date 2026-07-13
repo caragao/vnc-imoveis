@@ -18,8 +18,10 @@ Dashboard estático que consolida apartamentos **à venda** em Vila Nova Concei�
 - **Filtros**: metragem, preço, R$/m², nº mínimo de suítes, score, fonte
 - **Tabela ordenável** com link direto para o anúncio original em cada linha
 - **Gráfico de dispersão** preço × m²
-- **Anotações pessoais** por imóvel (endereço completo, comentário, score 1–5, visitado) — salvas no navegador (localStorage), com export/import para backup
+- **Anotações pessoais** por imóvel (endereço completo, comentário, score 1–5, visitado) — salvas **somente no seu navegador** (localStorage), com export/import manual para backup
 - **Download para Excel** (.xlsx) dos imóveis filtrados, incluindo suas anotações
+
+> ⚠️ **Privacidade (ADR-008):** este repositório e o GitHub Pages são **públicos**. Anotações pessoais **nunca são commitadas nem publicadas** — ficam só no seu navegador e nos backups que você exportar e guardar localmente.
 
 ## Como atualizar os dados (manual)
 
@@ -53,18 +55,21 @@ python -m http.server 8000
 As anotações ficam no `localStorage` do seu navegador. Para não perdê-las (troca de máquina, limpeza do navegador):
 
 1. No dashboard, clique em **Exportar anotações** → baixa `anotacoes.json`
-2. Substitua `data/anotacoes.json` no repo e faça commit
-3. Em outro dispositivo, o dashboard carrega esse arquivo e mescla com o localStorage (o mais recente vence)
+2. **Guarde esse arquivo localmente** (nunca no repo — ele é público; ver ADR-008). O `.gitignore` bloqueia `data/anotacoes.json` por segurança
+3. Em outro dispositivo/navegador, use **Importar anotações** — o merge mantém a versão mais recente de cada imóvel
+
+Formato do arquivo: ver [data/anotacoes.example.json](data/anotacoes.example.json) (dados fictícios).
 
 ## Estrutura do projeto
 
 ```
-index.html          dashboard (servido pelo GitHub Pages)
-assets/             JS/CSS do dashboard (vanilla, sem build)
-data/imoveis.json   dados raspados (gerado pelo scraper)
-data/anotacoes.json backup das anotações do usuário (nunca tocado pelo scraper)
-scraper/            coletor Python (um módulo por site)
-docs/               arquitetura, decision log (ADRs), notas dos scrapers
+index.html                   dashboard (servido pelo GitHub Pages)
+assets/                      JS/CSS do dashboard (vanilla, sem build)
+data/imoveis.json            dados raspados (gerado pelo scraper)
+data/anotacoes.example.json  formato do backup de anotações (fictício; o real nunca é commitado)
+scraper/                     coletor Python (um módulo por site) + validate_data.py + testes
+tests/js/                    testes da camada de anotações (Node puro)
+docs/                        arquitetura, decision log (ADRs), notas dos scrapers
 ```
 
 ## Para revisores e agentes (Claude, ChatGPT, etc.)

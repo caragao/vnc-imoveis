@@ -14,7 +14,7 @@
 - [ ] Mexi em schema de dados → `README.md`/`docs/ARCHITECTURE.md` atualizados (ou N/A)
 - [ ] Dados: rodei `python scraper/run.py` e o JSON validou (ou N/A)
 - [ ] Dashboard: testei localmente com `python -m http.server` (ou N/A)
-- [ ] Anotações do usuário preservadas (scraper não toca em `data/anotacoes.json`)
+- [ ] Privacidade: nenhuma anotação pessoal commitada/publicada; anotações só em localStorage + export local (ADR-008)
 
 ## Como testar
 
