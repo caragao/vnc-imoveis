@@ -28,7 +28,7 @@ Documento vivo: **toda mudança de seletor, URL ou quirk descoberto deve ser reg
 
 - **Stack:** custom (jQuery + templates `{{...}}`), dados via API própria.
 - **API:** `https://api.ph15.com/v1/site/listings`
-  - Autenticação: `apiKey` + `chaveIndicacao` **públicas, embutidas na home** em `<script>PARAMETROS = {...}</script>` — o scraper extrai em runtime (regex) com fallback hardcoded (`sites/ph15.py`). Se o fallback quebrar, re-extrair da home.
+  - Autenticação: `apiKey` + `chaveIndicacao` **públicas, embutidas na home** em `<script>PARAMETROS = {...}</script>` — o scraper extrai em runtime (regex), **sem fallback hardcoded**: se a extração falhar, a fonte levanta erro e `run.py` a registra em `fontes_com_falha` (decisão de review: credencial antiga mascarando falha é pior que falha visível). Para consertar, inspecionar a home e ajustar o regex em `_credenciais()`.
   - Filtros usados: `filtro-tagList[]=residencial&filtro-tagList[]=vende` + `filtro-idDgCidade=3` (São Paulo) + `filtro-idDgBairro=5` (Vila Nova Conceição).
   - Mapa de bairros/cidades: `GET /v1/site/meta`.
   - Paginação: `page`; na resposta, **`total` = número de PÁGINAS** (não de registros!) e `records` = total de registros. ~45 rows/página.
@@ -55,6 +55,8 @@ Documento vivo: **toda mudança de seletor, URL ou quirk descoberto deve ser reg
 - Parse de preço/área em `util.py` (`parse_preco_brl`, `parse_area_m2`) — trata `R$`, `\xa0`, milhar `.` e decimal `,`.
 - Anúncio sem preço ou sem área → descartar (sem R$/m² não serve à avaliação); contagem logada por fonte.
 - `run.py` deduplica por `id` e ordena por `preco_m2`; falha de uma fonte não aborta as outras (`fontes_com_falha` no envelope).
+- Normalização em `novo_imovel` (models.py): `dormitorios=0` com `suites>0` vira `dormitorios=None` — algumas fontes não contam a suíte como dormitório, e suíte é dormitório por definição; o total real é desconhecido, não zero.
+- `python scraper/validate_data.py` valida schema/integridade e imprime relatório de qualidade (roda também no CI, junto com os testes de `scraper/tests/`).
 
 ## Como debugar
 

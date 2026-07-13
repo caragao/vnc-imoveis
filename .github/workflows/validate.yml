@@ -1,0 +1,46 @@
+name: validate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Instala dependências (sem browsers — scrapers reais não rodam no CI)
+        run: pip install -r scraper/requirements.txt
+      - name: Sintaxe Python
+        run: python -m compileall scraper
+      - name: Testes unitários
+        working-directory: scraper
+        run: python -m unittest discover -v tests
+      - name: Valida schema e integridade de data/imoveis.json
+        run: python scraper/validate_data.py
+
+  javascript:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Sintaxe JS (node --check; vendor excluído)
+        run: |
+          shopt -s nullglob
+          for f in assets/*.js; do
+            echo "check $f"
+            node --check "$f"
+          done
+      - name: Testes JS (se existirem)
+        run: |
+          shopt -s nullglob
+          for f in tests/js/*.test.js; do
+            echo "run $f"
+            node "$f"
+          done

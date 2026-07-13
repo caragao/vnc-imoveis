@@ -34,4 +34,9 @@ def novo_imovel(**kwargs) -> Imovel:
     kwargs.setdefault("capturado_em", date.today().isoformat())
     if "preco_m2" not in kwargs:
         kwargs["preco_m2"] = round(kwargs["preco"] / kwargs["area_util_m2"])
+    # quirk das fontes: alguns anúncios trazem dormitorios=0 com suites>0
+    # (a suíte não é contada como dormitório). Suíte é um dormitório por
+    # definição — nesses casos o total de dormitórios é desconhecido, não zero.
+    if kwargs.get("dormitorios") == 0 and (kwargs.get("suites") or 0) > 0:
+        kwargs["dormitorios"] = None
     return Imovel(**kwargs)
