@@ -330,6 +330,8 @@ function renderTabela(vis) {
 
 // ---------- editor de anotações ----------
 function estrelas(n) {
+  // score pode vir de JSON importado — nunca confiar: força número inteiro 0-5
+  n = Math.max(0, Math.min(5, Math.trunc(Number(n) || 0)));
   let s = "";
   for (let i = 1; i <= 5; i++) s += i <= n ? "★" : "☆";
   return `<span class="estrelas" aria-label="score ${n} de 5">${s}</span>`;

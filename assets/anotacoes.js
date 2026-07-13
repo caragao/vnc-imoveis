@@ -17,10 +17,25 @@ const Anotacoes = (() => {
     localStorage.setItem(LS_KEY, JSON.stringify(cache));
   }
 
+  function _sanitizar(anot) {
+    // dados podem vir de JSON externo (repo/import) — normaliza tipos antes de
+    // qualquer uso: score inteiro 0-5, strings de fato strings, boolean de fato boolean
+    if (typeof anot !== "object" || anot === null) return null;
+    return {
+      endereco_completo: String(anot.endereco_completo ?? ""),
+      comentario: String(anot.comentario ?? ""),
+      score: Math.max(0, Math.min(5, Math.trunc(Number(anot.score) || 0))),
+      visitado: anot.visitado === true,
+      atualizado_em: String(anot.atualizado_em ?? ""),
+    };
+  }
+
   function _mesclar(a, b) {
     // b vence quando for mais recente (campo atualizado_em, ISO 8601)
     const saida = { ...a };
-    for (const [id, anot] of Object.entries(b)) {
+    for (const [id, bruto] of Object.entries(b)) {
+      const anot = _sanitizar(bruto);
+      if (!anot) continue;
       const atual = saida[id];
       if (!atual || (anot.atualizado_em || "") > (atual.atualizado_em || "")) {
         saida[id] = anot;
@@ -35,7 +50,8 @@ const Anotacoes = (() => {
       const r = await fetch("data/anotacoes.json", { cache: "no-store" });
       if (r.ok) doRepo = await r.json();
     } catch { /* offline ou arquivo ausente: segue só com localStorage */ }
-    cache = _mesclar(doRepo, _lerLocal());
+    // duas passadas para sanitizar os DOIS lados (repo e localStorage)
+    cache = _mesclar(_mesclar({}, doRepo), _lerLocal());
     _persistir();
     return cache;
   }
