@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Imóveis · Vila Nova Conceição</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏙️</text></svg>">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="topo">
+  <div>
+    <h1>Imóveis à venda · Vila Nova Conceição</h1>
+    <p class="sub">Anglo Americana · VNC · PH15 — <span id="atualizado-em"></span></p>
+  </div>
+  <div class="topo-acoes" id="topo-acoes"><!-- fase 4: export/import/excel --></div>
+</header>
+
+<section class="filtros" aria-label="Filtros">
+  <div class="filtro">
+    <label>Área (m²)</label>
+    <div class="faixa">
+      <input type="number" id="f-area-min" placeholder="mín" min="0" inputmode="numeric">
+      <span>–</span>
+      <input type="number" id="f-area-max" placeholder="máx" min="0" inputmode="numeric">
+    </div>
+  </div>
+  <div class="filtro">
+    <label>Preço (R$ mil)</label>
+    <div class="faixa">
+      <input type="number" id="f-preco-min" placeholder="mín" min="0" inputmode="numeric">
+      <span>–</span>
+      <input type="number" id="f-preco-max" placeholder="máx" min="0" inputmode="numeric">
+    </div>
+  </div>
+  <div class="filtro">
+    <label>R$/m² (mil)</label>
+    <div class="faixa">
+      <input type="number" id="f-pm2-min" placeholder="mín" min="0" step="0.5" inputmode="decimal">
+      <span>–</span>
+      <input type="number" id="f-pm2-max" placeholder="máx" min="0" step="0.5" inputmode="decimal">
+    </div>
+  </div>
+  <div class="filtro">
+    <label for="f-suites">Suítes</label>
+    <select id="f-suites">
+      <option value="">todas</option>
+      <option value="1">1+</option>
+      <option value="2">2+</option>
+      <option value="3">3+</option>
+      <option value="4">4+</option>
+    </select>
+  </div>
+  <div class="filtro">
+    <label for="f-tipo">Tipo</label>
+    <select id="f-tipo"><option value="">todos</option></select>
+  </div>
+  <div class="filtro filtro-fontes">
+    <label>Fonte</label>
+    <div class="fontes" id="f-fontes">
+      <label class="fonte-chk"><input type="checkbox" value="angloamericana" checked><span class="dot dot-anglo"></span>Anglo</label>
+      <label class="fonte-chk"><input type="checkbox" value="vnc" checked><span class="dot dot-vnc"></span>VNC</label>
+      <label class="fonte-chk"><input type="checkbox" value="ph15" checked><span class="dot dot-ph15"></span>PH15</label>
+    </div>
+  </div>
+  <div class="filtro filtro-extra" id="filtro-extra"><!-- fase 4: score/visitado --></div>
+  <button class="limpar" id="btn-limpar" type="button">Limpar filtros</button>
+</section>
+
+<section class="kpis" id="kpis" aria-label="Indicadores"></section>
+
+<section class="viz">
+  <div class="scatter-wrap">
+    <h2>Preço × área <span class="h2-sub">(cada ponto é um imóvel — clique para abrir)</span></h2>
+    <div id="scatter"></div>
+  </div>
+</section>
+
+<section class="tabela-wrap">
+  <table id="tabela">
+    <thead>
+      <tr>
+        <th data-col="fonte">Fonte</th>
+        <th data-col="tipo">Tipo</th>
+        <th data-col="titulo" class="col-titulo">Imóvel</th>
+        <th data-col="area_util_m2" class="num">Área m²</th>
+        <th data-col="preco" class="num">Preço</th>
+        <th data-col="preco_m2" class="num">R$/m²</th>
+        <th data-col="dormitorios" class="num">Dorm.</th>
+        <th data-col="suites" class="num">Suítes</th>
+        <th data-col="vagas" class="num">Vagas</th>
+        <th data-col="_link"></th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+  <p class="rodape" id="rodape"></p>
+</section>
+
+<div class="tooltip" id="tooltip" hidden></div>
+
+<script src="assets/app.js"></script>
+</body>
+</html>
