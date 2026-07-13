@@ -7,6 +7,7 @@
 const Anotacoes = (() => {
   const LS_KEY = "vnc-imoveis:anotacoes";
   let cache = {};
+  let persistindo = true; // false quando o navegador nega escrita (privado/quota)
 
   function _lerLocal() {
     try { return JSON.parse(localStorage.getItem(LS_KEY) || "{}"); }
@@ -14,7 +15,16 @@ const Anotacoes = (() => {
   }
 
   function _persistir() {
-    localStorage.setItem(LS_KEY, JSON.stringify(cache));
+    // escrita pode falhar (modo privado, quota, storage desabilitado) — o
+    // dashboard segue funcionando com as anotações só em memória nesta sessão
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify(cache));
+      persistindo = true;
+    } catch (e) {
+      persistindo = false;
+      console.warn("anotações: localStorage indisponível, mantendo só em memória", e);
+    }
+    return persistindo;
   }
 
   function _sanitizar(anot) {
@@ -89,5 +99,7 @@ const Anotacoes = (() => {
     });
   }
 
-  return { carregar, obter, salvar, todas, exportar, importar };
+  function persistiu() { return persistindo; }
+
+  return { carregar, obter, salvar, todas, exportar, importar, persistiu };
 })();

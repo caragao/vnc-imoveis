@@ -24,7 +24,13 @@ async function boot() {
   const resp = await fetch("data/imoveis.json");
   const dados = await resp.json();
   estado.imoveis = dados.imoveis;
-  estado.anotacoes = await Anotacoes.carregar();
+  try {
+    // a camada de anotações nunca pode impedir a listagem de carregar
+    estado.anotacoes = await Anotacoes.carregar();
+  } catch (e) {
+    console.warn("anotações indisponíveis, seguindo somente leitura", e);
+    estado.anotacoes = {};
+  }
   const dt = new Date(dados.atualizado_em);
   document.getElementById("atualizado-em").textContent =
     "dados de " + dt.toLocaleDateString("pt-BR") + " " +
@@ -378,8 +384,9 @@ function ligarEditor(corpo) {
   const salvar = (campos) => {
     Anotacoes.salvar(id, campos);
     estado.anotacoes = Anotacoes.todas();
-    linha.querySelector("#ed-status").textContent =
-      "salvo às " + new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    linha.querySelector("#ed-status").textContent = Anotacoes.persistiu()
+      ? "salvo às " + new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+      : "⚠ navegador sem armazenamento — anotações valem só nesta aba; use Exportar";
   };
   linha.querySelector("#ed-endereco").addEventListener("input", (e) => salvar({ endereco_completo: e.target.value }));
   linha.querySelector("#ed-comentario").addEventListener("input", (e) => salvar({ comentario: e.target.value }));
