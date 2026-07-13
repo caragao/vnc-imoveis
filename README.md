@@ -32,6 +32,13 @@ python run.py            # gera/atualiza data/imoveis.json
 
 Depois: commit + push. O GitHub Pages atualiza o dashboard automaticamente.
 
+Antes de commitar dados novos, rode o relatório de qualidade (o CI roda o mesmo script):
+
+```bash
+python scraper/validate_data.py
+# valida schema/integridade (bloqueia) e reporta outliers e possíveis duplicados (não bloqueia)
+```
+
 ## Como rodar o dashboard localmente
 
 ```bash
