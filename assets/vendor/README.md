@@ -10,7 +10,7 @@ funciona offline e sem dependência externa em runtime).
 | Biblioteca | SheetJS CE (xlsx), build `xlsx.mini.min.js` |
 | Versão | **0.20.3** (conferível em runtime: `XLSX.version`) |
 | Origem oficial | https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.mini.min.js |
-| SHA-256 | `d4a91ada2f20a8c059429b0946c36cb898e36396789127f65886ad28c1609c7a` |
+| SHA-256 | `0cb353f830d7288385492c83d277b058ddeac664ca51cf1393aa1fd3e2b70939` |
 | Licença | Apache License 2.0 — https://cdn.sheetjs.com/xlsx-0.20.3/package/LICENSE (© SheetJS LLC) |
 | Uso no projeto | `assets/excel.js` (`json_to_sheet` + `writeFile` para o botão "Baixar Excel") |
 

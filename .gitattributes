@@ -1,0 +1,3 @@
+# Vendor é artefato de terceiro: byte a byte igual ao original, nunca converter
+# line endings (o SHA-256 em assets/vendor/README.md deve bater em qualquer SO)
+assets/vendor/*.js -text
