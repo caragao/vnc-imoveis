@@ -94,7 +94,10 @@
 
 <section class="viz">
   <div class="scatter-wrap">
-    <h2>Preço × área <span class="h2-sub">(cada ponto é um imóvel — clique para abrir)</span></h2>
+    <div class="scatter-head">
+      <h2>Preço × área <span class="h2-sub">(cada ponto é um imóvel — clique para abrir)</span></h2>
+      <label class="chk-eixo"><input type="checkbox" id="chk-zero"> iniciar eixos no zero</label>
+    </div>
     <div id="scatter"></div>
   </div>
 </section>
@@ -112,6 +115,8 @@
         <th data-col="dormitorios" class="num">Dorm.</th>
         <th data-col="suites" class="num">Suítes</th>
         <th data-col="vagas" class="num">Vagas</th>
+        <th data-col="condominio" class="num">Condom.</th>
+        <th data-col="iptu" class="num">IPTU</th>
         <th data-col="_score">Score</th>
         <th data-col="_link"></th>
       </tr>

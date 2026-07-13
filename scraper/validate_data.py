@@ -82,6 +82,14 @@ def main() -> int:
     print(f"\nPossíveis duplicados entre fontes (mesma área arredondada + mesmo preço): "
           f"{sum(possiveis.values()) - len(possiveis)} pares em {len(possiveis)} grupos (diagnóstico, não bloqueia)")
 
+    # cobertura de custos (condomínio/IPTU) por fonte — diagnóstico, não bloqueia
+    print("\nCobertura de condomínio / IPTU (preenchidos / total):")
+    for fonte in sorted({im.fonte for im in imoveis}):
+        grupo = [im for im in imoveis if im.fonte == fonte]
+        com_cond = sum(1 for im in grupo if im.condominio is not None)
+        com_iptu = sum(1 for im in grupo if im.iptu is not None)
+        print(f"  {fonte:<15} condomínio {com_cond:>3}/{len(grupo):<3}  IPTU {com_iptu:>3}/{len(grupo)}")
+
     if erros:
         print(f"\n{len(erros)} VIOLAÇÕES DE INTEGRIDADE:", file=sys.stderr)
         for e in erros:

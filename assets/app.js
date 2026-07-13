@@ -12,18 +12,72 @@ const fmtBRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BR
 const fmtNum = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 });
 const fmtM2 = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 });
 
+// prioridade para escolher o imóvel "primário" de um grupo duplicado
+const PRIORIDADE_FONTE = { vnc: 0, ph15: 1, angloamericana: 2 };
+
 const estado = {
   imoveis: [],
   ordenacao: { col: "preco_m2", asc: true },
   anotacoes: {},
   editando: null, // id do imóvel com painel de edição aberto
+  dupInfo: {}, // id -> { fontesIrmas:[fonte], ehPrimario:bool } (só duplicados entre fontes)
 };
+
+// chave de duplicidade: mesma área arredondada + mesmo preço (igual a validate_data.py)
+function chaveDup(im) {
+  return Math.round(im.area_util_m2) + "|" + im.preco;
+}
+
+// Duplicados ENTRE fontes: mesmo (área, preço) em ≥2 fontes distintas.
+// Colisões dentro da mesma fonte são unidades diferentes — não marcadas.
+function calcularDuplicados(imoveis) {
+  const grupos = new Map();
+  for (const im of imoveis) {
+    const k = chaveDup(im);
+    if (!grupos.has(k)) grupos.set(k, []);
+    grupos.get(k).push(im);
+  }
+  const info = {};
+  for (const grupo of grupos.values()) {
+    const fontes = new Set(grupo.map((i) => i.fonte));
+    if (fontes.size < 2) continue;
+    // primário: primeiro com endereço, depois prioridade de fonte, depois id
+    const primario = [...grupo].sort((a, b) => {
+      const ea = a.endereco ? 0 : 1, eb = b.endereco ? 0 : 1;
+      if (ea !== eb) return ea - eb;
+      const pa = PRIORIDADE_FONTE[a.fonte] ?? 9, pb = PRIORIDADE_FONTE[b.fonte] ?? 9;
+      if (pa !== pb) return pa - pb;
+      return String(a.id).localeCompare(String(b.id));
+    })[0];
+    for (const im of grupo) {
+      info[im.id] = {
+        fontesIrmas: [...fontes].filter((f) => f !== im.fonte),
+        ehPrimario: im.id === primario.id,
+      };
+    }
+  }
+  return info;
+}
+
+// Reduz uma lista a um item por grupo duplicado (mantém a 1ª ocorrência).
+// Usado nos KPIs e no scatter para não inflar contagem/mediana.
+function semDuplicados(lista) {
+  const vistos = new Set();
+  return lista.filter((im) => {
+    if (!estado.dupInfo[im.id]) return true;
+    const k = chaveDup(im);
+    if (vistos.has(k)) return false;
+    vistos.add(k);
+    return true;
+  });
+}
 
 // ---------- boot ----------
 async function boot() {
   const resp = await fetch("data/imoveis.json");
   const dados = await resp.json();
   estado.imoveis = dados.imoveis;
+  estado.dupInfo = calcularDuplicados(estado.imoveis);
   try {
     // a camada de anotações nunca pode impedir a listagem de carregar
     estado.anotacoes = await Anotacoes.carregar();
@@ -54,8 +108,9 @@ async function boot() {
 
 // ---------- ações do topo (excel / export / import) ----------
 function ligarAcoes() {
+  document.getElementById("chk-zero").addEventListener("change", render);
   document.getElementById("btn-excel").addEventListener("click", () =>
-    baixarExcel(ordenar(filtrar()), Anotacoes.todas())
+    baixarExcel(ordenar(filtrar()), Anotacoes.todas(), estado.dupInfo)
   );
   document.getElementById("btn-exportar").addEventListener("click", () => Anotacoes.exportar());
   document.getElementById("input-importar").addEventListener("change", async (ev) => {
@@ -153,14 +208,18 @@ function mediana(nums) {
 
 function renderKpis(vis) {
   const el = document.getElementById("kpis");
-  const medPm2 = mediana(vis.map((i) => i.preco_m2));
-  const medArea = mediana(vis.map((i) => i.area_util_m2));
-  const precos = vis.map((i) => i.preco);
+  // KPIs contam cada grupo duplicado entre fontes uma vez só (não inflar)
+  const unicos = semDuplicados(vis);
+  const nDup = vis.length - unicos.length;
+  const medPm2 = mediana(unicos.map((i) => i.preco_m2));
+  const medArea = mediana(unicos.map((i) => i.area_util_m2));
+  const precos = unicos.map((i) => i.preco);
   const kpis = [
-    { rotulo: "Imóveis", valor: fmtNum.format(vis.length), compl: `de ${fmtNum.format(estado.imoveis.length)}` },
-    { rotulo: "Mediana R$/m²", valor: medPm2 ? fmtBRL.format(medPm2) : "—", compl: "dos filtrados" },
+    { rotulo: "Imóveis", valor: fmtNum.format(unicos.length),
+      compl: `de ${fmtNum.format(estado.imoveis.length)}` + (nDup ? ` · ${nDup} dup. entre fontes` : "") },
+    { rotulo: "Mediana R$/m²", valor: medPm2 ? fmtBRL.format(medPm2) : "—", compl: "sem duplicados" },
     { rotulo: "Faixa de preço", valor: precos.length ? fmtBRL.format(Math.min(...precos)) : "—", compl: precos.length ? "a " + fmtBRL.format(Math.max(...precos)) : "" },
-    { rotulo: "Mediana de área", valor: medArea ? fmtM2.format(medArea) + " m²" : "—", compl: "dos filtrados" },
+    { rotulo: "Mediana de área", valor: medArea ? fmtM2.format(medArea) + " m²" : "—", compl: "sem duplicados" },
   ];
   el.innerHTML = kpis.map((k) => `
     <div class="kpi">
@@ -173,16 +232,46 @@ function renderKpis(vis) {
 // ---------- scatter SVG (preço × área) ----------
 const SVG_NS = "http://www.w3.org/2000/svg";
 
+// Escala "redonda" (passo 1-2-5) ajustada ao range dos dados.
+// Sem iniciarNoZero, o eixo começa perto do menor valor (não desperdiça
+// espaço quando, p.ex., o filtro de área ≥150 afasta tudo da origem).
+function escalaNice(min, max, iniciarNoZero) {
+  if (iniciarNoZero) min = 0;
+  if (!(max > min)) { // degenerado (um ponto só ou range zero)
+    const base = max || 1;
+    min = iniciarNoZero ? 0 : base * 0.9;
+    max = base * 1.1 || 1;
+  }
+  // domínio com 5% de folga; o início NÃO é preso ao passo (senão um passo
+  // grande arrastaria o eixo de volta ao zero quando o mínimo é pequeno)
+  const pad = (max - min) * 0.05;
+  const domMin = iniciarNoZero ? 0 : Math.max(0, min - pad);
+  const domMax = max + pad;
+  // passo "redondo" (1-2-5) só para os rótulos/gridlines
+  const bruto = (domMax - domMin) / 5;
+  const mag = Math.pow(10, Math.floor(Math.log10(bruto)));
+  const norm = bruto / mag;
+  const passo = (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10) * mag;
+  const ticks = [];
+  for (let v = Math.ceil(domMin / passo) * passo; v <= domMax + passo * 0.001; v += passo) ticks.push(v);
+  return { min: domMin, max: domMax, ticks };
+}
+
 function renderScatter(vis) {
   const wrap = document.getElementById("scatter");
   wrap.innerHTML = "";
   if (!vis.length) { wrap.innerHTML = '<p class="rodape">Nenhum imóvel com os filtros atuais.</p>'; return; }
 
+  // um ponto por grupo duplicado entre fontes (consistente com os KPIs)
+  const dados = semDuplicados(vis);
+  const iniciarNoZero = document.getElementById("chk-zero")?.checked ?? false;
+
   const W = 960, H = 340, M = { top: 12, right: 20, bottom: 34, left: 64 };
-  const xs = vis.map((i) => i.area_util_m2), ys = vis.map((i) => i.preco);
-  const xMax = Math.max(...xs) * 1.05, yMax = Math.max(...ys) * 1.05;
-  const x = (v) => M.left + (v / xMax) * (W - M.left - M.right);
-  const y = (v) => H - M.bottom - (v / yMax) * (H - M.top - M.bottom);
+  const xs = dados.map((i) => i.area_util_m2), ys = dados.map((i) => i.preco);
+  const ex = escalaNice(Math.min(...xs), Math.max(...xs), iniciarNoZero);
+  const ey = escalaNice(Math.min(...ys), Math.max(...ys), iniciarNoZero);
+  const x = (v) => M.left + ((v - ex.min) / (ex.max - ex.min)) * (W - M.left - M.right);
+  const y = (v) => H - M.bottom - ((v - ey.min) / (ey.max - ey.min)) * (H - M.top - M.bottom);
 
   const svg = document.createElementNS(SVG_NS, "svg");
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
@@ -190,9 +279,7 @@ function renderScatter(vis) {
   svg.setAttribute("aria-label", "Dispersão de preço por área dos imóveis filtrados");
 
   // gridlines horizontais + rótulos do eixo y
-  const yTicks = 4;
-  for (let t = 0; t <= yTicks; t++) {
-    const v = (yMax / yTicks) * t;
+  for (const v of ey.ticks) {
     const linha = document.createElementNS(SVG_NS, "line");
     linha.setAttribute("class", "gridline");
     linha.setAttribute("x1", M.left); linha.setAttribute("x2", W - M.right);
@@ -205,9 +292,7 @@ function renderScatter(vis) {
     svg.appendChild(txt);
   }
   // eixo x: rótulos de área
-  const xTicks = 6;
-  for (let t = 0; t <= xTicks; t++) {
-    const v = (xMax / xTicks) * t;
+  for (const v of ex.ticks) {
     const txt = document.createElementNS(SVG_NS, "text");
     txt.setAttribute("x", x(v)); txt.setAttribute("y", H - M.bottom + 18);
     txt.setAttribute("text-anchor", "middle");
@@ -227,7 +312,7 @@ function renderScatter(vis) {
   svg.appendChild(eixo);
 
   // pontos: ≥8px de alvo com anel de 2px da superfície (marks-and-anatomy)
-  for (const im of vis) {
+  for (const im of dados) {
     const c = document.createElementNS(SVG_NS, "circle");
     c.setAttribute("class", "ponto");
     c.setAttribute("cx", x(im.area_util_m2));
@@ -253,7 +338,8 @@ function mostrarTooltip(ev, im) {
     <div class="t-titulo">${escapeHtml(im.titulo)}</div>
     <div class="t-linha">${FONTES[im.fonte].rotulo} · ${escapeHtml(im.tipo)}</div>
     <div class="t-linha">${fmtM2.format(im.area_util_m2)} m² · ${fmtBRL.format(im.preco)} · ${fmtBRL.format(im.preco_m2)}/m²</div>
-    <div class="t-linha">${im.dormitorios ?? "?"} dorm · ${im.suites ?? "?"} suítes · ${im.vagas ?? "?"} vagas</div>`;
+    <div class="t-linha">${im.dormitorios ?? "?"} dorm · ${im.suites ?? "?"} suítes · ${im.vagas ?? "?"} vagas</div>
+    <div class="t-linha">cond. ${im.condominio != null ? fmtBRL.format(im.condominio) : "—"} · IPTU ${im.iptu != null ? fmtBRL.format(im.iptu) : "—"}</div>`;
   t.hidden = false;
   const margem = 14;
   let px = ev.clientX + margem, py = ev.clientY + margem;
@@ -304,17 +390,24 @@ function renderTabela(vis) {
 
   corpo.innerHTML = ordenados.map((im) => {
     const a = estado.anotacoes[im.id];
+    const dup = estado.dupInfo[im.id];
+    const classes = [a?.visitado ? "visitado" : "", dup && !dup.ehPrimario ? "dup" : ""].filter(Boolean).join(" ");
+    const selo = dup
+      ? `<span class="selo-dup" title="Mesma área e preço em outra fonte — contado uma vez nos KPIs">↔ também em ${dup.fontesIrmas.map((f) => FONTES[f].rotulo).join(", ")}</span>`
+      : "";
     const linha = `
-    <tr data-id="${escapeHtml(im.id)}"${a?.visitado ? ' class="visitado"' : ""}>
+    <tr data-id="${escapeHtml(im.id)}"${classes ? ` class="${classes}"` : ""}>
       <td><span class="fonte-tag"><span class="dot" style="background:${FONTES[im.fonte].cor}"></span>${FONTES[im.fonte].rotulo}</span></td>
       <td>${escapeHtml(im.tipo)}</td>
-      <td class="col-titulo"><a class="titulo-link" href="${escapeHtml(im.url)}" target="_blank" rel="noopener">${escapeHtml(im.titulo)}</a>${im.endereco ? `<br><span class="rodape">${escapeHtml(im.endereco)}</span>` : ""}${a?.endereco_completo ? `<br><span class="rodape">📍 ${escapeHtml(a.endereco_completo)}</span>` : ""}${a?.comentario ? `<br><span class="rodape comentario">💬 ${escapeHtml(a.comentario)}</span>` : ""}</td>
+      <td class="col-titulo"><a class="titulo-link" href="${escapeHtml(im.url)}" target="_blank" rel="noopener">${escapeHtml(im.titulo)}</a>${selo}${im.endereco ? `<br><span class="rodape">${escapeHtml(im.endereco)}</span>` : ""}${a?.endereco_completo ? `<br><span class="rodape">📍 ${escapeHtml(a.endereco_completo)}</span>` : ""}${a?.comentario ? `<br><span class="rodape comentario">💬 ${escapeHtml(a.comentario)}</span>` : ""}</td>
       <td class="num">${fmtM2.format(im.area_util_m2)}</td>
       <td class="num">${fmtBRL.format(im.preco)}</td>
       <td class="num">${fmtBRL.format(im.preco_m2)}</td>
       <td class="num">${im.dormitorios ?? "—"}</td>
       <td class="num">${im.suites ?? "—"}</td>
       <td class="num">${im.vagas ?? "—"}</td>
+      <td class="num">${im.condominio != null ? fmtBRL.format(im.condominio) : "—"}</td>
+      <td class="num">${im.iptu != null ? fmtBRL.format(im.iptu) : "—"}</td>
       <td class="col-score"><button type="button" class="score-btn" data-editar="${escapeHtml(im.id)}" title="Anotar este imóvel">${estrelas(a?.score || 0)}${a?.visitado ? ' <span class="check">✓</span>' : ""}</button></td>
       <td><a class="abrir" href="${escapeHtml(im.url)}" target="_blank" rel="noopener">abrir ↗</a></td>
     </tr>`;
@@ -350,7 +443,7 @@ function linhaEditor(im) {
   ).join("");
   return `
     <tr class="linha-editor" data-editor-de="${escapeHtml(im.id)}">
-      <td colspan="11">
+      <td colspan="13">
         <div class="editor">
           <div class="editor-campo">
             <label>Endereço completo</label>
