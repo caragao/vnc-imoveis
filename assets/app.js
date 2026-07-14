@@ -23,9 +23,16 @@ const estado = {
   dupInfo: {}, // id -> { fontesIrmas:[fonte], ehPrimario:bool } (só duplicados entre fontes)
 };
 
-// chave de duplicidade: mesma área arredondada + mesmo preço (igual a validate_data.py)
+// chave de duplicidade: mesma área arredondada + mesmo preço.
+// Arredondamento meio-para-cima explícito (floor(x+0,5)) para bater exatamente
+// com scraper/validate_data.py — Math.round e o round() do Python divergem em
+// .5 (round(26.5) é 26 no Python, 27 no JS). Manter as duas regras idênticas.
+function arredondarArea(area) {
+  return Math.floor(area + 0.5);
+}
+
 function chaveDup(im) {
-  return Math.round(im.area_util_m2) + "|" + im.preco;
+  return arredondarArea(im.area_util_m2) + "|" + im.preco;
 }
 
 // Duplicados ENTRE fontes: mesmo (área, preço) em ≥2 fontes distintas.

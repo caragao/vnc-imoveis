@@ -12,6 +12,7 @@ Outliers (área/preço fora de faixa, possíveis duplicados entre fontes) são
 reportados como diagnóstico e NÃO bloqueiam.
 """
 import json
+import math
 import sys
 from collections import Counter
 from pathlib import Path
@@ -75,9 +76,12 @@ def main() -> int:
 
     # diagnóstico de possíveis duplicados entre fontes (sem deduplicar):
     # mesma área arredondada + preço igual em fontes diferentes
+    # arredondamento meio-para-cima (floor(x+0.5)), idêntico ao chaveDup de
+    # assets/app.js — o round() do Python usa banker's rounding (round(26.5)==26)
+    # e divergiria do dashboard em áreas .5; manter as duas regras iguais.
     chaves = Counter()
     for im in imoveis:
-        chaves[(round(im.area_util_m2), im.preco)] += 1
+        chaves[(math.floor(im.area_util_m2 + 0.5), im.preco)] += 1
     possiveis = {k: n for k, n in chaves.items() if n > 1}
     print(f"\nPossíveis duplicados entre fontes (mesma área arredondada + mesmo preço): "
           f"{sum(possiveis.values()) - len(possiveis)} pares em {len(possiveis)} grupos (diagnóstico, não bloqueia)")
