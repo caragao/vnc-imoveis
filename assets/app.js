@@ -35,75 +35,68 @@ function chaveDup(im) {
   return arredondarArea(im.area_util_m2) + "|" + im.preco;
 }
 
-// Duplicados ENTRE fontes: mesmo (área, preço) em ≥2 fontes distintas.
-// Colisões dentro da mesma fonte são unidades diferentes — não marcadas.
-function calcularDuplicados(imoveis) {
-  const grupos = new Map();
-  for (const im of imoveis) {
-    const k = chaveDup(im);
-    if (!grupos.has(k)) grupos.set(k, []);
-    grupos.get(k).push(im);
-  }
-  const info = {};
-  for (const grupo of grupos.values()) {
-    const fontes = new Set(grupo.map((i) => i.fonte));
-    if (fontes.size < 2) continue;
-    // primário: primeiro com endereço, depois prioridade de fonte, depois id
-    const primario = [...grupo].sort((a, b) => {
-      const ea = a.endereco ? 0 : 1, eb = b.endereco ? 0 : 1;
-      if (ea !== eb) return ea - eb;
-      const pa = PRIORIDADE_FONTE[a.fonte] ?? 9, pb = PRIORIDADE_FONTE[b.fonte] ?? 9;
-      if (pa !== pb) return pa - pb;
-      return String(a.id).localeCompare(String(b.id));
-    })[0];
-    for (const im of grupo) {
-      info[im.id] = {
-        fontesIrmas: [...fontes].filter((f) => f !== im.fonte),
-        ehPrimario: im.id === primario.id,
-      };
-    }
-  }
-  return info;
-}
-
-// Colapsa duplicados ENTRE fontes sem descartar unidades distintas.
-// Num grupo (mesma área+preço), o nº de unidades reais = maior nº de anúncios
-// de uma mesma fonte (fontes diferentes anunciam a MESMA unidade; a mesma
-// fonte lista unidades DIFERENTES). Mantemos os anúncios da fonte dominante e
-// descartamos só os "ecos" das outras fontes. Autossuficiente: opera sobre a
-// lista recebida, então funciona igual com qualquer filtro aplicado.
-// Usado nos KPIs e no scatter para não inflar contagem/mediana.
-function semDuplicados(lista) {
+function agruparPorChave(lista) {
   const grupos = new Map();
   for (const im of lista) {
     const k = chaveDup(im);
     if (!grupos.has(k)) grupos.set(k, []);
     grupos.get(k).push(im);
   }
-  const manter = new Set();
-  for (const grupo of grupos.values()) {
-    // agrupa por fonte dentro do bucket
-    const porFonte = new Map();
+  return grupos;
+}
+
+// Dentro de um bucket (mesma área+preço), quais anúncios representam unidades
+// REAIS: os da fonte com mais anúncios (desempate por prioridade). Fontes
+// diferentes anunciam a MESMA unidade (ecos cross-source); a mesma fonte lista
+// unidades DIFERENTES. Para bucket de fonte única, são todos reais.
+// Fonte de verdade compartilhada por semDuplicados (colapso dos KPIs) e
+// calcularDuplicados (marcação da tabela) — assim o que é mantido e o que é
+// marcado como primário nunca se invertem.
+function unidadesReais(grupo) {
+  const porFonte = new Map();
+  for (const im of grupo) {
+    if (!porFonte.has(im.fonte)) porFonte.set(im.fonte, []);
+    porFonte.get(im.fonte).push(im);
+  }
+  let dominante = null;
+  for (const [fonte, lst] of porFonte) {
+    const atual = dominante ? porFonte.get(dominante) : null;
+    if (!atual || lst.length > atual.length ||
+        (lst.length === atual.length &&
+         (PRIORIDADE_FONTE[fonte] ?? 9) < (PRIORIDADE_FONTE[dominante] ?? 9))) {
+      dominante = fonte;
+    }
+  }
+  return porFonte.get(dominante);
+}
+
+// Duplicados ENTRE fontes: mesmo (área, preço) em ≥2 fontes distintas.
+// Colisões dentro da mesma fonte são unidades diferentes — não marcadas.
+// ehPrimario = o anúncio é uma unidade real (mantida nos KPIs); os demais do
+// bucket são ecos de outras fontes (esmaecidos na tabela).
+function calcularDuplicados(imoveis) {
+  const info = {};
+  for (const grupo of agruparPorChave(imoveis).values()) {
+    const fontes = new Set(grupo.map((i) => i.fonte));
+    if (fontes.size < 2) continue;
+    const reais = new Set(unidadesReais(grupo).map((i) => i.id));
     for (const im of grupo) {
-      if (!porFonte.has(im.fonte)) porFonte.set(im.fonte, []);
-      porFonte.get(im.fonte).push(im);
+      info[im.id] = {
+        fontesIrmas: [...fontes].filter((f) => f !== im.fonte),
+        ehPrimario: reais.has(im.id),
+      };
     }
-    if (porFonte.size < 2) {
-      // uma fonte só (inclui buckets de tamanho 1): todas são unidades distintas
-      for (const im of grupo) manter.add(im.id);
-      continue;
-    }
-    // várias fontes: mantém a fonte com mais anúncios (desempate por prioridade)
-    let dominante = null;
-    for (const [fonte, lst] of porFonte) {
-      const atual = dominante ? porFonte.get(dominante) : null;
-      if (!atual || lst.length > atual.length ||
-          (lst.length === atual.length &&
-           (PRIORIDADE_FONTE[fonte] ?? 9) < (PRIORIDADE_FONTE[dominante] ?? 9))) {
-        dominante = fonte;
-      }
-    }
-    for (const im of porFonte.get(dominante)) manter.add(im.id);
+  }
+  return info;
+}
+
+// Colapsa duplicados ENTRE fontes sem descartar unidades distintas: mantém as
+// unidades reais de cada bucket. Autossuficiente (opera sobre a lista recebida),
+// então funciona igual com qualquer filtro. Usado nos KPIs e no scatter.
+function semDuplicados(lista) {
+  const manter = new Set();
+  for (const grupo of agruparPorChave(lista).values()) {
+    for (const im of unidadesReais(grupo)) manter.add(im.id);
   }
   return lista.filter((im) => manter.has(im.id));
 }
