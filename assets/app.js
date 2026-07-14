@@ -20,7 +20,6 @@ const estado = {
   ordenacao: { col: "preco_m2", asc: true },
   anotacoes: {},
   editando: null, // id do imóvel com painel de edição aberto
-  dupInfo: {}, // id -> { fontesIrmas:[fonte], ehPrimario:bool } (só duplicados entre fontes)
 };
 
 // chave de duplicidade: mesma área arredondada + mesmo preço.
@@ -49,9 +48,6 @@ function agruparPorChave(lista) {
 // REAIS: os da fonte com mais anúncios (desempate por prioridade). Fontes
 // diferentes anunciam a MESMA unidade (ecos cross-source); a mesma fonte lista
 // unidades DIFERENTES. Para bucket de fonte única, são todos reais.
-// Fonte de verdade compartilhada por semDuplicados (colapso dos KPIs) e
-// calcularDuplicados (marcação da tabela) — assim o que é mantido e o que é
-// marcado como primário nunca se invertem.
 function unidadesReais(grupo) {
   const porFonte = new Map();
   for (const im of grupo) {
@@ -70,35 +66,30 @@ function unidadesReais(grupo) {
   return porFonte.get(dominante);
 }
 
-// Duplicados ENTRE fontes: mesmo (área, preço) em ≥2 fontes distintas.
-// Colisões dentro da mesma fonte são unidades diferentes — não marcadas.
-// ehPrimario = o anúncio é uma unidade real (mantida nos KPIs); os demais do
-// bucket são ecos de outras fontes (esmaecidos na tabela).
-function calcularDuplicados(imoveis) {
+// Análise de duplicados ENTRE fontes para UMA lista — SEMPRE recomputada sobre o
+// conjunto visível (respeita filtros), então marcação e contagem nunca divergem:
+// se um filtro esconde a fonte-irmã, o que sobra deixa de ser tratado como
+// duplicado. Retorna:
+//   manter — Set de ids das unidades reais (KPIs/scatter contam só esses)
+//   info   — id -> { fontesIrmas, ehPrimario } só para buckets com ≥2 fontes
+//            (ehPrimario = unidade real; os demais são ecos esmaecidos na tabela)
+function analisarDuplicados(lista) {
   const info = {};
-  for (const grupo of agruparPorChave(imoveis).values()) {
+  const manter = new Set();
+  for (const grupo of agruparPorChave(lista).values()) {
+    const reais = unidadesReais(grupo);
+    for (const im of reais) manter.add(im.id);
     const fontes = new Set(grupo.map((i) => i.fonte));
-    if (fontes.size < 2) continue;
-    const reais = new Set(unidadesReais(grupo).map((i) => i.id));
+    if (fontes.size < 2) continue; // só marca duplicados ENTRE fontes
+    const idsReais = new Set(reais.map((i) => i.id));
     for (const im of grupo) {
       info[im.id] = {
         fontesIrmas: [...fontes].filter((f) => f !== im.fonte),
-        ehPrimario: reais.has(im.id),
+        ehPrimario: idsReais.has(im.id),
       };
     }
   }
-  return info;
-}
-
-// Colapsa duplicados ENTRE fontes sem descartar unidades distintas: mantém as
-// unidades reais de cada bucket. Autossuficiente (opera sobre a lista recebida),
-// então funciona igual com qualquer filtro. Usado nos KPIs e no scatter.
-function semDuplicados(lista) {
-  const manter = new Set();
-  for (const grupo of agruparPorChave(lista).values()) {
-    for (const im of unidadesReais(grupo)) manter.add(im.id);
-  }
-  return lista.filter((im) => manter.has(im.id));
+  return { info, manter };
 }
 
 // ---------- boot ----------
@@ -106,7 +97,6 @@ async function boot() {
   const resp = await fetch("data/imoveis.json");
   const dados = await resp.json();
   estado.imoveis = dados.imoveis;
-  estado.dupInfo = calcularDuplicados(estado.imoveis);
   try {
     // a camada de anotações nunca pode impedir a listagem de carregar
     estado.anotacoes = await Anotacoes.carregar();
@@ -138,9 +128,11 @@ async function boot() {
 // ---------- ações do topo (excel / export / import) ----------
 function ligarAcoes() {
   document.getElementById("chk-zero").addEventListener("change", render);
-  document.getElementById("btn-excel").addEventListener("click", () =>
-    baixarExcel(ordenar(filtrar()), Anotacoes.todas(), estado.dupInfo)
-  );
+  document.getElementById("btn-excel").addEventListener("click", () => {
+    const lista = ordenar(filtrar());
+    // marca duplicados sobre a mesma lista exportada (respeita o filtro atual)
+    baixarExcel(lista, Anotacoes.todas(), analisarDuplicados(lista).info);
+  });
   document.getElementById("btn-exportar").addEventListener("click", () => Anotacoes.exportar());
   document.getElementById("input-importar").addEventListener("change", async (ev) => {
     const arq = ev.target.files[0];
@@ -222,9 +214,12 @@ function ligarFiltros() {
 // ---------- render ----------
 function render() {
   const visiveis = filtrar();
-  renderKpis(visiveis);
-  renderScatter(visiveis);
-  renderTabela(visiveis);
+  // uma única análise de duplicados por render, sobre o conjunto visível —
+  // KPIs, scatter e tabela partem exatamente do mesmo resultado
+  const dup = analisarDuplicados(visiveis);
+  renderKpis(visiveis, dup);
+  renderScatter(visiveis, dup);
+  renderTabela(visiveis, dup);
   document.dispatchEvent(new CustomEvent("dashboard:render", { detail: { visiveis } }));
 }
 
@@ -235,10 +230,10 @@ function mediana(nums) {
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 }
 
-function renderKpis(vis) {
+function renderKpis(vis, dup) {
   const el = document.getElementById("kpis");
   // KPIs contam cada grupo duplicado entre fontes uma vez só (não inflar)
-  const unicos = semDuplicados(vis);
+  const unicos = vis.filter((im) => dup.manter.has(im.id));
   const nDup = vis.length - unicos.length;
   const medPm2 = mediana(unicos.map((i) => i.preco_m2));
   const medArea = mediana(unicos.map((i) => i.area_util_m2));
@@ -286,13 +281,13 @@ function escalaNice(min, max, iniciarNoZero) {
   return { min: domMin, max: domMax, ticks };
 }
 
-function renderScatter(vis) {
+function renderScatter(vis, dup) {
   const wrap = document.getElementById("scatter");
   wrap.innerHTML = "";
   if (!vis.length) { wrap.innerHTML = '<p class="rodape">Nenhum imóvel com os filtros atuais.</p>'; return; }
 
   // um ponto por grupo duplicado entre fontes (consistente com os KPIs)
-  const dados = semDuplicados(vis);
+  const dados = vis.filter((im) => dup.manter.has(im.id));
   const iniciarNoZero = document.getElementById("chk-zero")?.checked ?? false;
 
   const W = 960, H = 340, M = { top: 12, right: 20, bottom: 34, left: 64 };
@@ -406,7 +401,7 @@ function ordenar(vis) {
   });
 }
 
-function renderTabela(vis) {
+function renderTabela(vis, analise) {
   const corpo = document.querySelector("#tabela tbody");
   const ordenados = ordenar(vis);
 
@@ -419,7 +414,7 @@ function renderTabela(vis) {
 
   corpo.innerHTML = ordenados.map((im) => {
     const a = estado.anotacoes[im.id];
-    const dup = estado.dupInfo[im.id];
+    const dup = analise.info[im.id];
     const classes = [a?.visitado ? "visitado" : "", dup && !dup.ehPrimario ? "dup" : ""].filter(Boolean).join(" ");
     const selo = dup
       ? `<span class="selo-dup" title="Mesma área e preço em outra fonte — contado uma vez nos KPIs">↔ também em ${dup.fontesIrmas.map((f) => FONTES[f].rotulo).join(", ")}</span>`
