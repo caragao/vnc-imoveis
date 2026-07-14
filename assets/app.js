@@ -59,17 +59,46 @@ function calcularDuplicados(imoveis) {
   return info;
 }
 
-// Reduz uma lista a um item por grupo duplicado (mantém a 1ª ocorrência).
+// Colapsa duplicados ENTRE fontes sem descartar unidades distintas.
+// Num grupo (mesma área+preço), o nº de unidades reais = maior nº de anúncios
+// de uma mesma fonte (fontes diferentes anunciam a MESMA unidade; a mesma
+// fonte lista unidades DIFERENTES). Mantemos os anúncios da fonte dominante e
+// descartamos só os "ecos" das outras fontes. Autossuficiente: opera sobre a
+// lista recebida, então funciona igual com qualquer filtro aplicado.
 // Usado nos KPIs e no scatter para não inflar contagem/mediana.
 function semDuplicados(lista) {
-  const vistos = new Set();
-  return lista.filter((im) => {
-    if (!estado.dupInfo[im.id]) return true;
+  const grupos = new Map();
+  for (const im of lista) {
     const k = chaveDup(im);
-    if (vistos.has(k)) return false;
-    vistos.add(k);
-    return true;
-  });
+    if (!grupos.has(k)) grupos.set(k, []);
+    grupos.get(k).push(im);
+  }
+  const manter = new Set();
+  for (const grupo of grupos.values()) {
+    // agrupa por fonte dentro do bucket
+    const porFonte = new Map();
+    for (const im of grupo) {
+      if (!porFonte.has(im.fonte)) porFonte.set(im.fonte, []);
+      porFonte.get(im.fonte).push(im);
+    }
+    if (porFonte.size < 2) {
+      // uma fonte só (inclui buckets de tamanho 1): todas são unidades distintas
+      for (const im of grupo) manter.add(im.id);
+      continue;
+    }
+    // várias fontes: mantém a fonte com mais anúncios (desempate por prioridade)
+    let dominante = null;
+    for (const [fonte, lst] of porFonte) {
+      const atual = dominante ? porFonte.get(dominante) : null;
+      if (!atual || lst.length > atual.length ||
+          (lst.length === atual.length &&
+           (PRIORIDADE_FONTE[fonte] ?? 9) < (PRIORIDADE_FONTE[dominante] ?? 9))) {
+        dominante = fonte;
+      }
+    }
+    for (const im of porFonte.get(dominante)) manter.add(im.id);
+  }
+  return lista.filter((im) => manter.has(im.id));
 }
 
 // ---------- boot ----------
