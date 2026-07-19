@@ -107,8 +107,10 @@ body {
   background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
   padding: 14px 16px 8px;
 }
+.scatter-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .scatter-wrap h2 { margin: 0 0 6px; font-size: 14px; font-weight: 650; }
 .h2-sub { font-weight: 400; color: var(--muted); font-size: 12px; }
+.chk-eixo { font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 5px; cursor: pointer; white-space: nowrap; }
 #scatter svg { display: block; width: 100%; height: auto; }
 #scatter .ponto { cursor: pointer; }
 #scatter text { fill: var(--muted); font-size: 11px; font-family: inherit; }
@@ -145,6 +147,12 @@ td .titulo-link:hover { text-decoration: underline; }
 }
 .abrir:hover { background: var(--hover-wash); }
 .rodape { color: var(--muted); font-size: 12px; }
+tr.dup td { background: var(--plane); }
+tr.dup td:first-child { box-shadow: inset 3px 0 0 var(--baseline); }
+.selo-dup {
+  display: inline-block; margin-left: 6px; font-size: 11px; color: var(--muted);
+  border: 1px solid var(--baseline); border-radius: 999px; padding: 0 7px; white-space: nowrap;
+}
 
 /* ---------- anotações ---------- */
 .col-score { white-space: nowrap; }

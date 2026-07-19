@@ -54,6 +54,6 @@ gh pr create --fill
 
 ## Armadilhas conhecidas
 
-- `data/imoveis.json` é sobrescrito por completo a cada execução do scraper — histórico fica nos commits do git.
+- `data/imoveis.json` é sobrescrito por completo a cada execução do scraper — histórico fica nos commits do git. **Exceção:** `scraper/backfill_extras.py` edita só os campos novos (`condominio`/`iptu`) e os títulos da VNC, sem tocar em preço/área/`atualizado_em` — usado para retroalimentar dados sem re-coletar tudo.
 - O dashboard precisa funcionar via `python -m http.server` E no GitHub Pages (paths relativos sempre).
 - Excel brasileiro + CSV = encoding quebrado; por isso export é `.xlsx` via SheetJS vendorizado (ADR-007).

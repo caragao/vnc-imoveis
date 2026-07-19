@@ -28,6 +28,30 @@ def _slugify(s: str) -> str:
     return re.sub(r"\s+", "-", _sem_acento(s).lower().strip())
 
 
+def titulo_vnc(tipo: str, area: float, endereco: str | None) -> str:
+    """Compõe um título útil a partir dos campos (a API manda name='Imóvel N').
+
+    Ex.: 'Apartamento · 71 m² · Rua Afonso Braz'. Sem endereço, omite a rua.
+    A rua sai sem o número final ('Rua Afonso Braz, 692' -> 'Rua Afonso Braz').
+    """
+    tipo = (tipo or "Imóvel").strip()
+    partes = [tipo, f"{area:g} m²"]
+    if endereco:
+        rua = re.sub(r",\s*\d+.*$", "", endereco.strip()).strip()
+        if rua:
+            partes.append(rua)
+    return " · ".join(partes)
+
+
+def _iptu_vnc(item: dict) -> int | None:
+    """iptu/monthlyPropertyTax vêm como '2000.00' (mesmo formato de sellingPrice)."""
+    valor = item.get("iptu") or item.get("monthlyPropertyTax")
+    try:
+        return int(float(valor)) if valor not in (None, "") else None
+    except (ValueError, TypeError):
+        return None
+
+
 def _url_anuncio(item: dict) -> str:
     """Replica a construção de URL do front da VNC (chunk 8320)."""
     ref = str(item.get("reference") or "")
@@ -62,18 +86,19 @@ def coletar() -> list[Imovel]:
                 descartados += 1
                 continue
             endereco = (item.get("address") or {}).get("street")
-            titulo = (item.get("name") or "").strip() or f"{tipo} {item.get('reference')}"
             imoveis.append(novo_imovel(
                 id=f"vnc-{item.get('reference')}",
                 fonte="vnc",
                 url=_url_anuncio(item),
-                titulo=titulo,
+                titulo=titulo_vnc(tipo, area, endereco),
                 tipo=tipo,
                 preco=int(preco),
                 area_util_m2=area,
                 dormitorios=parse_int(item.get("bedrooms")),
                 suites=parse_int(item.get("suites")),
                 vagas=parse_int(item.get("parkingSpaces")),
+                condominio=None,  # VNC não expõe condomínio na API
+                iptu=_iptu_vnc(item),
                 endereco=endereco,
             ))
         if not data.get("hasMorePages"):

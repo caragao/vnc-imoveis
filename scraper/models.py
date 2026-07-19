@@ -19,6 +19,8 @@ class Imovel(BaseModel):
     dormitorios: Optional[int] = Field(default=None, ge=0)
     suites: Optional[int] = Field(default=None, ge=0)
     vagas: Optional[int] = Field(default=None, ge=0)
+    condominio: Optional[int] = Field(default=None, ge=0, description="condomínio mensal em reais")
+    iptu: Optional[int] = Field(default=None, ge=0, description="IPTU em reais (período varia por fonte)")
     endereco: Optional[str] = None
     capturado_em: str
 

@@ -73,6 +73,8 @@ def coletar() -> list[Imovel]:
                 dormitorios=parse_int(row.get("dormitorios")),
                 suites=parse_int(row.get("suites")),
                 vagas=parse_int(row.get("vagas")),
+                condominio=parse_preco_brl(row.get("valorCondominio") or ""),
+                iptu=parse_preco_brl(row.get("valorIptu") or ""),
                 endereco=row.get("logradouro"),
             ))
         total_paginas = d.get("total") or 1  # "total" = número de páginas nesta API

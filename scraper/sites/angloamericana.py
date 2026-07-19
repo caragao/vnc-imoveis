@@ -71,8 +71,10 @@ def coletar() -> list[Imovel]:
                 descartados += 1
                 continue
 
-            # detalhe: suítes + endereço (quando exibido)
+            # detalhe: suítes + condomínio/IPTU (best-effort; só existem aqui)
             suites = None
+            condominio = None
+            iptu = None
             try:
                 page.goto(SITE + href, wait_until="domcontentloaded", timeout=60000)
                 page.wait_for_timeout(DELAY_MS + 1500)
@@ -81,6 +83,10 @@ def coletar() -> list[Imovel]:
                     suites = int(m.group(1))
                 elif m := re.search(r"(\d+)\s*su[ií]tes?", corpo, re.I):
                     suites = int(m.group(1))
+                if m := re.search(r"Condom[ií]nio[^R]*R\$\s*[\d\.]+(?:,\d+)?", corpo, re.I):
+                    condominio = parse_preco_brl(m.group(0))
+                if m := re.search(r"IPTU[^R]*R\$\s*[\d\.]+(?:,\d+)?", corpo, re.I):
+                    iptu = parse_preco_brl(m.group(0))
             except Exception as e:
                 print(f"[anglo] aviso: detalhe {codigo} falhou ({e})")
 
@@ -95,6 +101,8 @@ def coletar() -> list[Imovel]:
                 dormitorios=info.get("dormitorios"),
                 suites=suites,
                 vagas=info.get("vagas"),
+                condominio=condominio,
+                iptu=iptu,
                 endereco=None,
             ))
         browser.close()

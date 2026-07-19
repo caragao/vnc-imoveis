@@ -105,3 +105,31 @@ Formato de cada entrada: **Contexto → Decisão → Alternativas rejeitadas →
 **Alternativas rejeitadas:** repo privado (perderia GitHub Pages gratuito e a facilidade de compartilhar o dashboard); criptografar anotações no repo (complexidade e gestão de chave — fora do escopo).
 
 **Consequências:** sincronização entre dispositivos é 100% manual (exportar → transferir por canal privado → importar). Perda do navegador sem backup exportado = perda das anotações; o dashboard avisa quando o armazenamento não persiste.
+
+---
+
+## ADR-009 — Schema ganha `condominio` e `iptu`
+**Data:** 2026-07-13 · **Status:** aceito
+
+**Contexto:** o custo real de morar não é só o preço — condomínio e IPTU pesam no mês a mês. Sondagem das fontes confirmou que os dados existem: VNC expõe `iptu`/`monthlyPropertyTax` na API (sem condomínio), PH15 expõe `valorCondominio` e `valorIptu`, e a Anglo mostra ambos na página de detalhe.
+
+**Decisão:** adicionar dois campos **opcionais** ao `Imovel` (`scraper/models.py`): `condominio: Optional[int]` e `iptu: Optional[int]`, em reais. Opcionais porque nem toda fonte/anúncio expõe os dois (VNC não tem condomínio; alguns anúncios omitem valores). O período (mensal/anual) varia por fonte e **não é normalizado** — armazenamos o valor que a fonte informa; o dashboard exibe como está.
+
+**Alternativas rejeitadas:** normalizar tudo para mensal (as fontes não rotulam o período de forma confiável); campo único "custo mensal" somando os dois (perde a distinção e mistura períodos incertos).
+
+**Consequências:** duas colunas ordenáveis na tabela + no Excel + no tooltip. Valores podem parecer inconsistentes entre fontes (períodos diferentes) — é um diagnóstico, não uma métrica exata. Cobertura reportada por `validate_data.py`.
+
+---
+
+## ADR-010 — Duplicados entre fontes: marcar, nunca deletar
+**Data:** 2026-07-13 · **Status:** aceito
+
+**Contexto:** o mesmo imóvel costuma ser anunciado por mais de uma imobiliária, aparecendo 2–3x no JSON consolidado (fontes têm `id` próprio, então `run.py` não os funde). Isso **infla a contagem e a mediana** dos KPIs. Deletar seria arriscado: a heurística de igualdade não é perfeita e cada anúncio pode ter dados complementares (endereço na VNC, condomínio na PH15).
+
+**Decisão:** detectar duplicados **entre fontes** no front (`assets/app.js`, `analisarDuplicados`) pela chave `(área arredondada, preço)`, considerando só grupos que abrangem ≥2 fontes distintas (colisões dentro da mesma fonte são unidades diferentes). O arredondamento da área usa a regra **meio-para-cima explícita** `floor(x+0,5)`, idêntica no dashboard (`arredondarArea`) e no validador (`validate_data.py`) — o `round()` do Python usa banker's rounding e divergiria em áreas `.5`. Num grupo, as **unidades reais** são as da fonte com mais anúncios (`unidadesReais`); as demais fontes são ecos da mesma unidade. Os **KPIs e o scatter** contam só as unidades reais; a **tabela mostra todas as linhas**, esmaecendo os ecos e marcando com selo `↔ também em {fonte}`. Nada é removido dos dados nem da tabela.
+
+A análise é **recomputada a cada render sobre o conjunto visível** (uma chamada de `analisarDuplicados` por render, compartilhada por KPIs/scatter/tabela). Assim a marcação nunca contradiz a contagem sob filtros: se um filtro esconde a fonte-irmã, o que sobra deixa de ser tratado como duplicado (ex.: só PH15 → nenhuma linha esmaecida, todas contadas).
+
+**Alternativas rejeitadas:** deduplicar no scraper apagando linhas (perde dados complementares e é irreversível no JSON); colapsar grupos em uma linha só (esconde anúncios que o usuário pode querer abrir).
+
+**Consequências:** KPIs deixam de inflar; o usuário ainda vê e abre cada anúncio. A chave é sensível a arredondamento de área — casos com área ligeiramente diferente entre fontes podem escapar (aceitável para um diagnóstico visual).
