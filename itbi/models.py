@@ -11,20 +11,26 @@ from pydantic import BaseModel, Field, field_validator
 # Classificação do ativo pelo código de USO (IPTU), da aba "Tabela de USOS".
 # É a base econômica das inclusões/exclusões — não usar corte por percentil no
 # lugar disto (ver docs/ITBI.md). Uso não mapeado -> "Outro"; ausente -> None.
+# Mapa completo dos códigos da aba "Tabela de USOS" (0–85). Qualquer código novo
+# numa atualização futura cai em "Outro" e é sinalizado pelo validate_data.py.
 TIPO_POR_USO = {
     0: "Terreno",
-    10: "Casa", 12: "Casa", 13: "Casa", 14: "Casa",
+    10: "Casa", 12: "Casa", 14: "Casa",
+    13: "Habitação coletiva",
     20: "Apartamento",
     21: "Prédio residencial (inteiro)",  # área = prédio todo, NÃO é unidade
-    22: "Prédio de uso misto",
-    24: "Vaga de garagem", 62: "Vaga de garagem", 63: "Vaga de garagem",
+    22: "Prédio de uso misto", 32: "Prédio de uso misto",
+    23: "Vaga de garagem", 24: "Vaga de garagem", 62: "Vaga de garagem", 63: "Vaga de garagem",
     25: "Flat",
     26: "Depósito",
-    30: "Escritório/Consultório", 31: "Escritório/Consultório", 32: "Escritório/Consultório",
+    30: "Escritório/Consultório", 31: "Escritório/Consultório",
     40: "Loja", 41: "Loja", 42: "Loja",
-    50: "Indústria", 51: "Indústria",
-    60: "Oficina", 61: "Oficina",
-    70: "Outro (diversão/serviço)", 71: "Escola", 72: "Templo",
+    43: "Uso múltiplo", 64: "Uso múltiplo", 74: "Uso múltiplo", 84: "Uso múltiplo",
+    50: "Indústria", 51: "Indústria/armazém",
+    60: "Oficina", 61: "Posto de serviço",
+    70: "Diversão/clube", 71: "Escola", 72: "Templo",
+    80: "Hotel/hospedaria", 81: "Saúde", 82: "Mídia/emissora", 83: "Institucional",
+    85: "Flat comercial",
 }
 
 # Unidades residenciais de MERCADO usadas nos KPIs/scatter padrão. Só unidades

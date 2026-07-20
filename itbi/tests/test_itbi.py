@@ -5,7 +5,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from models import novo, USOS_RESIDENCIAIS  # noqa: E402
-from util import fmt_cep, is_vnc, normalizar, texto, inteiro, rua_bloqueada  # noqa: E402
+from util import fmt_cep, is_vnc, normalizar, texto, inteiro, rua_bloqueada, bairro_outro  # noqa: E402
 from build import _proporcao  # noqa: E402
 
 
@@ -119,8 +119,14 @@ class TestNovaTransacao(unittest.TestCase):
         self.assertEqual(novo(**{**self.BASE, "uso": 25}).tipo_ativo, "Flat")
         self.assertEqual(novo(**{**self.BASE, "uso": 10}).tipo_ativo, "Casa")
         self.assertEqual(novo(**{**self.BASE, "uso": 24}).tipo_ativo, "Vaga de garagem")
+        self.assertEqual(novo(**{**self.BASE, "uso": 23}).tipo_ativo, "Vaga de garagem")  # comercial
+        self.assertEqual(novo(**{**self.BASE, "uso": 80}).tipo_ativo, "Hotel/hospedaria")
+        self.assertEqual(novo(**{**self.BASE, "uso": 85}).tipo_ativo, "Flat comercial")
         self.assertEqual(novo(**{**self.BASE, "uso": 0}).tipo_ativo, "Terreno")
         self.assertEqual(novo(**{**self.BASE, "uso": None}).tipo_ativo, "Não classificado")
+        # hotel e flat comercial NÃO são unidade residencial de mercado
+        self.assertFalse(novo(**{**self.BASE, "uso": 80}).residencial)
+        self.assertFalse(novo(**{**self.BASE, "uso": 85}).residencial)
 
     def test_flag_integral(self):
         self.assertTrue(novo(**{**self.BASE, "proporcao": 100.0}).integral)
@@ -135,7 +141,7 @@ class TestRuaBloqueada(unittest.TestCase):
     def test_ruas_de_itaim_vila_olimpia_bloqueadas(self):
         for rua in ["R JOAO CACHOEIRA", "R CLODOMIRO AMAZONAS",
                     "R DR EDUARDO DE SOUZA ARANHA", "R DR FADLO HAIDAR",
-                    "AV PRES JUSCELINO KUBITSCHEK"]:
+                    "AV PRES JUSCELINO KUBITSCHEK", "AV STO AMARO"]:  # arterial de divisa
             self.assertTrue(rua_bloqueada(rua), f"deveria bloquear {rua}")
 
     def test_ruas_de_vnc_nao_bloqueadas(self):
@@ -146,6 +152,16 @@ class TestRuaBloqueada(unittest.TestCase):
         # defesa extra: rótulo VNC + CEP na faixa, mas rua de Itaim -> rejeita
         self.assertFalse(is_vnc("VILA NOVA CONCEICAO", 4510000, "R JOAO CACHOEIRA"))
         self.assertTrue(is_vnc("VILA NOVA CONCEICAO", 4510000, "R AFONSO BRAZ"))
+
+
+class TestBairroOutro(unittest.TestCase):
+    def test_rotulos_de_outro_bairro(self):
+        for b in ["INDIANOPOLIS", "ITAIM BIBI", "VILA OLIMPIA", "MOEMA", "JARDIM PAULISTA"]:
+            self.assertTrue(bairro_outro(b), f"deveria marcar {b} como outro bairro")
+
+    def test_rotulo_conceicao_prevalece(self):
+        self.assertFalse(bairro_outro("VILA NOVA CONCEICAO"))
+        self.assertFalse(bairro_outro(None))  # sem rótulo não é "outro"
 
 
 if __name__ == "__main__":

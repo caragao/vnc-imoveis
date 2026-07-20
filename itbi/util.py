@@ -50,7 +50,29 @@ _RUAS_NAO_VNC = (
     # Moema / Indianópolis (nomes de ave e adjacências) — dividem CEP com VNC
     "SABIA", "PINTASSILGO", "TUIM", "JACUTINGA", "GRAUNA", "PERIQUITO", "ARAGUARI",
     "REPUBLICA DO LIBANO",
+    # Arterial de divisa: Av. Santo Amaro atravessa VNC/Indianópolis/Vila Olímpia
+    # e mistura os três no MESMO CEP (04505) — não dá p/ resolver por CEP+rua, e a
+    # testada de VNC é mínima. Excluída inteira (ADR-012); frontais de VNC caem nos
+    # ambíguos p/ revisão manual, nunca incluídos por default.
+    "STO AMARO",
 )
+
+# Rótulos que nomeiam EXPLICITAMENTE outro bairro. Um registro assim não é VNC,
+# mesmo numa rua do allowlist (ex.: Av. Santo Amaro rotulada "INDIANOPOLIS").
+# Só barram a RECUPERAÇÃO por allowlist — nunca contradizem um rótulo Conceição.
+_BAIRROS_OUTROS = (
+    "INDIANOPOLIS", "ITAIM", "VILA OLIMPIA", "VL OLIMPIA", "MOEMA", "IBIRAPUERA",
+    "JARDIM PAULISTA", "JD PAULISTA", "VILA UBERABINHA", "PARAISO", "BROOKLIN",
+    "CAMPO BELO", "VL NOVA CONCEICAO SAUDE",
+)
+
+
+def bairro_outro(bairro) -> bool:
+    """Rótulo nomeia explicitamente um bairro vizinho (não é Vila Nova Conceição)."""
+    b = normalizar(bairro)
+    if "NOVA CONCEICAO" in b or "VNCONCEICAO" in b:
+        return False  # rótulo Conceição prevalece
+    return any(t in b for t in _BAIRROS_OUTROS)
 
 
 def cep_em_vnc(cep) -> bool:

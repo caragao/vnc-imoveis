@@ -78,11 +78,19 @@ Por isso **não se usa o rótulo para incluir** — o critério é **CEP + logra
    aparecem com rótulo "Nova Conceição" **e** CEP na faixa (alta confiança, ~31 ruas). Inclui-se
    então **todo** registro na faixa cujo logradouro está no allowlist — independentemente do
    rótulo. Isso recupera as ~900 transações de VNC que o rótulo escondia.
-3. **Blocklist (`util._RUAS_NAO_VNC`):** ruas confirmadas de bairro vizinho (Itaim/VO e as de ave
-   de Moema) nunca entram, nem no allowlist.
-4. **Ambíguos:** CEP na faixa mas logradouro **não** confirmado (ex.: Correia de Oliveira,
+3. **Blocklist (`util._RUAS_NAO_VNC`):** ruas confirmadas de bairro vizinho (Itaim/VO, ruas de ave
+   de Moema) e a **Av. Santo Amaro** — arterial de divisa que mistura VNC/Indianópolis/Vila Olímpia
+   no mesmo CEP (04505) e não se resolve por CEP+rua — nunca entram.
+4. **Rótulo de outro bairro (`util.bairro_outro`):** mesmo numa rua do allowlist, um registro cujo
+   Bairro nomeia explicitamente outro bairro (Indianópolis, Itaim, Moema…) **não** é recuperado
+   (só não vale contra um rótulo "Conceição").
+5. **Ambíguos:** CEP na faixa mas logradouro **não** confirmado (ex.: Correia de Oliveira,
    Natividade) → **não** são incluídos; ficam listados na auditoria do `build.py` para revisão
    manual. Nunca se aceita ambíguo por default.
+
+**Classificação de uso (`models.TIPO_POR_USO`):** mapeia todos os códigos da aba "Tabela de USOS"
+(0–85), inclusive hotel (80), flat comercial (85), garagem comercial (23). Código novo cai em
+"Outro" e é sinalizado. Unidade residencial de mercado (KPIs) = uso 20/25/10.
 
 O `validate_data.py` confere que nenhum CEP fora de `04500`–`04515` passou, e o `build.py` imprime
 a auditoria completa (allowlist, aceitas, excluídas por CEP/rua, ambíguas, delta vs JSON anterior).

@@ -197,6 +197,7 @@ def coletar(dir_raw):
         "linhas_brutas": 0, "aceitas_vnc": 0, "descartadas_dados": 0,
         "excluidas_cep": 0,     # rótulo diz Conceição mas CEP fora da faixa VNC
         "excluidas_rua": 0,     # logradouro é de bairro vizinho (blocklist)
+        "excluidas_bairro_outro": 0,  # rótulo nomeia outro bairro (ex.: Indianópolis)
         "ambiguos_revisar": 0,  # CEP na faixa mas rua não confirmada como VNC
         "proporcao_default": 0,
         "ceps": Counter(), "ruas_incluidas": Counter(),
@@ -238,7 +239,13 @@ def coletar(dir_raw):
             aud["excluidas_rua"] += 1
             aud["ruas_excluidas"][rua] += 1
             continue
-        if rua not in allowlist:  # rua não confirmada como VNC -> ambíguo, não incluir
+        rotulo = util.rotulo_conceicao(r.get("bairro"))
+        # rótulo explícito de outro bairro barra a recuperação (ex.: Sto Amaro
+        # "INDIANOPOLIS"); só não vale contra um rótulo Conceição.
+        if not rotulo and util.bairro_outro(r.get("bairro")):
+            aud["excluidas_bairro_outro"] += 1
+            continue
+        if not (rotulo or rua in allowlist):  # rua não confirmada -> ambíguo
             aud["ambiguos_revisar"] += 1
             aud["ambiguos"][rua] += 1
             continue
@@ -272,6 +279,7 @@ def _imprimir_auditoria(aud, delta):
     print(f"transações únicas (pós-dedup) ....... {aud['unicas']}")
     print(f"excluídas: rótulo VNC + CEP fora .... {aud['excluidas_cep']}")
     print(f"excluídas: rua de bairro vizinho .... {aud['excluidas_rua']} {dict(aud['ruas_excluidas'])}")
+    print(f"excluídas: rótulo de outro bairro ... {aud['excluidas_bairro_outro']}")
     amb = aud["ambiguos"].most_common(15)
     print(f"AMBÍGUAS (CEP VNC, rua não confirmada): {aud['ambiguos_revisar']} — NÃO incluídas, revisar:")
     for rua, n in amb:
