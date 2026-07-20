@@ -54,6 +54,30 @@ body {
 }
 .acao:hover { background: var(--hover-wash); }
 .acao-primaria { border-color: var(--serie-anglo); color: var(--serie-anglo); font-weight: 600; }
+.nav-link { color: var(--serie-anglo); text-decoration: none; }
+.nav-link:hover { text-decoration: underline; }
+
+/* legenda de cor por ano (scatter de transações) */
+.legenda { display: inline-flex; gap: 12px; font-size: 12px; color: var(--ink-2); }
+.leg-item { display: inline-flex; align-items: center; gap: 5px; }
+
+/* seção de metodologia e limitações (dashboard de transações) */
+.metodologia { margin: 0 24px 40px; }
+.metodologia details {
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+  padding: 4px 16px;
+}
+.metodologia summary {
+  cursor: pointer; padding: 10px 0; font-size: 14px; font-weight: 650; color: var(--ink-1);
+}
+.metod-corpo { font-size: 13px; color: var(--ink-2); line-height: 1.55; padding-bottom: 8px; }
+.metod-corpo ul { margin: 8px 0 0; padding-left: 18px; }
+.metod-corpo li { margin-bottom: 7px; }
+.metod-corpo code {
+  background: var(--plane); border: 1px solid var(--border); border-radius: 4px;
+  padding: 0 4px; font-size: 12px;
+}
+@media (max-width: 720px) { .metodologia { margin-left: 12px; margin-right: 12px; } }
 
 /* ---------- filtros: uma linha acima dos gráficos ---------- */
 .filtros {

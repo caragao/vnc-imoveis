@@ -13,14 +13,19 @@ Projeto: dashboard estático de imóveis à venda em Vila Nova Conceição (SP),
 ## Arquitetura em 30 segundos
 
 ```
-scraper/run.py  ──gera──▶  data/imoveis.json  ──fetch──▶  index.html + assets/*.js
-(Python, manual)           (commitado no git)             (vanilla JS, GitHub Pages)
+scraper/run.py  ──gera──▶  data/imoveis.json    ──fetch──▶  index.html + assets/*.js
+(Python, manual)           (commitado no git)               (vanilla JS, GitHub Pages)
+
+itbi/build.py   ──gera──▶  data/transacoes.json ──fetch──▶  transacoes.html + assets/itbi*.js
+(lê .xlsx da Prefeitura)   (commitado no git)               (segundo dashboard — ADR-011)
 ```
 
 - **Sem backend, sem build step, sem framework.** O dashboard é HTML/CSS/JS puro que qualquer agente consegue revisar. Não introduzir React/bundlers/CDNs — dependências JS são vendorizadas em `assets/vendor/`.
-- **Duas camadas de dados independentes**, unidas pelo `id` do imóvel:
-  - `data/imoveis.json` — só o scraper escreve. Envelope `{"atualizado_em", "imoveis": [...]}`.
-  - Anotações do usuário — **somente localStorage** + export/import manual (ADR-008). **O scraper nunca toca em anotações.**
+- **Duas fontes de dados independentes**, cada uma com seu pipeline e sua página (ADR-011):
+  - `data/imoveis.json` (oferta) — só `scraper/run.py` escreve. Envelope `{"atualizado_em", "imoveis": [...]}`. Página `index.html`.
+  - `data/transacoes.json` (transações fechadas via ITBI) — só `itbi/build.py` escreve. Envelope `{"atualizado_em", "fonte", "periodo", "total", "transacoes": [...]}`. Página `transacoes.html`. Ver `docs/ITBI.md`.
+  - Anotações do usuário — **somente localStorage** + export/import manual (ADR-008). Só no dashboard de imóveis. **O scraper nunca toca em anotações.**
+- **Planilhas brutas de ITBI (`itbi/raw/*.xlsx`, ~65 MB) NUNCA são commitadas** (`.gitignore`) — atualizadas mensalmente pela Prefeitura; só o `data/transacoes.json` derivado entra no repo (ADR-011).
 - **PRIVACIDADE (ADR-008): o repo e o Pages são públicos.** Anotações pessoais (endereço, comentários, score, visitado) **nunca podem ser commitadas** — `data/anotacoes.json` está no `.gitignore` e não existe fetch dele no código. Não criar nenhum fluxo que incentive commitar esses dados; só `data/anotacoes.example.json` (fictício) é versionado.
 - Schema do imóvel validado por Pydantic em `scraper/models.py`. `id` = `{fonte}-{código do anúncio}` (estável entre execuções).
 
@@ -32,11 +37,16 @@ cd scraper && pip install -r requirements.txt && playwright install chromium
 python run.py
 python validate_data.py       # relatório de qualidade + validação (CI roda o mesmo)
 
+# atualizar transações ITBI (planilhas da Prefeitura em itbi/raw/, não commitadas)
+cd itbi && pip install -r requirements.txt
+python build.py               # gera data/transacoes.json (só VNC)
+python validate_data.py       # relatório + validação de schema
+
 # testes
-python -m unittest discover tests          # em scraper/
+python -m unittest discover tests          # em scraper/ e em itbi/
 node tests/js/anotacoes.test.js            # na raiz
 
-# dashboard local
+# dashboard local (serve index.html e transacoes.html)
 python -m http.server 8000   # na raiz do repo
 
 # PR

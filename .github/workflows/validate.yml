@@ -14,14 +14,21 @@ jobs:
         with:
           python-version: "3.12"
       - name: Instala dependências (sem browsers — scrapers reais não rodam no CI)
-        run: pip install -r scraper/requirements.txt
+        run: |
+          pip install -r scraper/requirements.txt
+          pip install -r itbi/requirements.txt
       - name: Sintaxe Python
-        run: python -m compileall scraper
-      - name: Testes unitários
+        run: python -m compileall scraper itbi
+      - name: Testes unitários (scraper)
         working-directory: scraper
+        run: python -m unittest discover -v tests
+      - name: Testes unitários (itbi)
+        working-directory: itbi
         run: python -m unittest discover -v tests
       - name: Valida schema e integridade de data/imoveis.json
         run: python scraper/validate_data.py
+      - name: Valida schema e qualidade de data/transacoes.json
+        run: python itbi/validate_data.py
 
   javascript:
     runs-on: ubuntu-latest

@@ -19,3 +19,8 @@ tmp/
 
 # anotações pessoais NUNCA são commitadas (repo público — ADR-008)
 data/anotacoes.json
+
+# planilhas brutas de ITBI da Prefeitura (~65 MB, atualizadas mensalmente) —
+# nunca commitadas; só o JSON derivado data/transacoes.json entra no repo (ADR-011)
+itbi/raw/
+*.xlsx
