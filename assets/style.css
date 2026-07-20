@@ -199,6 +199,12 @@ tr.dup td:first-child { box-shadow: inset 3px 0 0 var(--baseline); }
   font-size: 10px; color: var(--muted); border: 1px solid var(--baseline);
   border-radius: 999px; padding: 0 5px; vertical-align: middle;
 }
+/* chip do filtro por prédio (deep-link vindo do dashboard de venda) */
+.predio-ativo {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  margin: 0 0 12px; padding: 8px 12px; font-size: 13px;
+  border: 1px solid var(--serie-vnc); border-radius: 8px; background: var(--plane);
+}
 
 /* ---------- anotações ---------- */
 .col-score { white-space: nowrap; }

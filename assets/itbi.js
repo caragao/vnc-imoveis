@@ -20,6 +20,8 @@ const estado = {
   naturezaPadrao: "", // "1.Compra e venda" se existir — default de "mercado residencial"
   // conciliação com a oferta (ADR-013): Map(chave de prédio -> {qtde, areas:[área útil]})
   imoveisPorPredio: new Map(),
+  // filtro exato por prédio vindo do deep-link (?rua=&num=), ou null
+  predioURL: null,
 };
 
 // ---------- boot ----------
@@ -105,11 +107,16 @@ function decorarTransacoes() {
   }
 }
 
-// ?rua=<core>&num=<n> vindos do dashboard de venda: pré-preenche a busca pela rua.
+// ?rua=<core>&num=<n> vindos do dashboard de venda. Com número, filtra pelo
+// PRÉDIO EXATO (chave de prédio) — não só a rua — para o link de Afonso Braz 537
+// não trazer todos os números da Afonso Braz. Sem número, cai na busca por rua.
 function aplicarDeepLink() {
   const p = new URLSearchParams(location.search);
   const rua = p.get("rua");
-  if (rua) document.getElementById("f-busca").value = rua;
+  const num = p.get("num");
+  const chave = Conciliacao.chaveEndereco(rua, num);
+  if (chave) estado.predioURL = chave;
+  else if (rua) document.getElementById("f-busca").value = rua;
 }
 
 function ligarAcoesAreas() {
@@ -210,6 +217,7 @@ function filtrar() {
     (f.accMax === null || (t.acc ?? Infinity) <= f.accMax) &&
     (!f.so100 || t.proporcao >= 100) &&
     (!f.soVenda || t.tem_venda) &&
+    (!estado.predioURL || Conciliacao.chaveTransacao(t) === estado.predioURL) &&
     casaBusca(t, f.busca)
   );
 }
@@ -223,6 +231,7 @@ function ligarFiltros() {
     document.getElementById("f-busca").value = "";
     document.getElementById("f-100").checked = false;
     document.getElementById("f-venda").checked = false;
+    estado.predioURL = null;
     document.getElementById("f-ano").value = "";
     document.getElementById("f-natureza").value = estado.naturezaPadrao;
     document.getElementById("f-uso").value = "residencial";
@@ -233,10 +242,27 @@ function ligarFiltros() {
 
 // ---------- render ----------
 function render() {
+  renderPredioAtivo();
   const vis = filtrar();
   renderKpis(vis);
   renderScatter(vis);
   renderTabela(vis);
+}
+
+// chip do filtro por prédio (deep-link): mostra qual prédio está isolado e um
+// botão para limpar — senão o filtro exato ficaria invisível para o usuário.
+function renderPredioAtivo() {
+  const el = document.getElementById("predio-ativo");
+  if (!el) return;
+  if (!estado.predioURL) { el.hidden = true; el.innerHTML = ""; return; }
+  const [core, num] = estado.predioURL.split("#");
+  el.hidden = false;
+  el.innerHTML = `<span>Prédio: <strong>${escapeHtml(core)}, ${escapeHtml(num)}</strong></span>` +
+    `<button type="button" class="acao" id="predio-limpar">✕ limpar prédio</button>`;
+  el.querySelector("#predio-limpar").addEventListener("click", () => {
+    estado.predioURL = null;
+    render();
+  });
 }
 
 function mediana(nums) {
