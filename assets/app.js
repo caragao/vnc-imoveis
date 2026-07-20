@@ -137,8 +137,16 @@ async function carregarTransacoes() {
   try {
     const resp = await fetch("data/transacoes.json");
     const dados = await resp.json();
-    // marca só transações recentes (2025/2026), por prédio
-    const recentes = (dados.transacoes || []).filter((t) => t.ano === 2025 || t.ano === 2026);
+    // Marca só transações recentes (2025/2026) do MERCADO RESIDENCIAL DE COMPRA E
+    // VENDA — o mesmo default do painel de transações (ADR-012). Assim todo prédio
+    // marcado aqui tem uma transação visível lá: garagem/loja (uso não residencial)
+    // e transferências não-mercado (herança/doação) ficam de fora, evitando marcar
+    // "teve transação" quando o único negócio no prédio some do painel irmão.
+    const recentes = (dados.transacoes || []).filter((t) =>
+      (t.ano === 2025 || t.ano === 2026) &&
+      t.residencial &&
+      (t.natureza || "").includes("Compra e venda")
+    );
     const idx = Conciliacao.indexarPorPredio(recentes, Conciliacao.chaveTransacao);
     estado.transacoesPorPredio = new Map();
     for (const [chave, arr] of idx) {
@@ -424,7 +432,7 @@ function seloTransacao(im) {
   const chave = estado.chavePredio.get(im.id);
   const [core, num] = chave.split("#");
   const href = `transacoes.html?rua=${encodeURIComponent(core)}&num=${encodeURIComponent(num)}`;
-  const titulo = `Prédio com ${info.qtde} transação(ões) de ITBI em ${info.anos.join("/")} — clique para ver as transações`;
+  const titulo = `Prédio com ${info.qtde} transação(ões) residencial(is) de compra e venda (ITBI) em ${info.anos.join("/")} — clique para ver as transações`;
   return ` <a class="selo-trans" href="${href}" title="${escapeHtml(titulo)}">🧾 transação ${info.anos.join("/")}</a>`;
 }
 
@@ -440,7 +448,7 @@ function mostrarTooltip(ev, im) {
     <div class="t-linha">${fmtM2.format(im.area_util_m2)} m² · ${fmtBRL.format(im.preco)} · ${fmtBRL.format(im.preco_m2)}/m²</div>
     <div class="t-linha">${im.dormitorios ?? "?"} dorm · ${im.suites ?? "?"} suítes · ${im.vagas ?? "?"} vagas</div>
     <div class="t-linha">cond. ${im.condominio != null ? fmtBRL.format(im.condominio) : "—"} · IPTU ${im.iptu != null ? fmtBRL.format(im.iptu) : "—"}</div>
-    ${info ? `<div class="t-linha">🧾 prédio c/ ${info.qtde} transação(ões) ITBI em ${info.anos.join("/")}</div>` : ""}`;
+    ${info ? `<div class="t-linha">🧾 prédio c/ ${info.qtde} transação(ões) resid. de compra e venda em ${info.anos.join("/")}</div>` : ""}`;
   t.hidden = false;
   const margem = 14;
   let px = ev.clientX + margem, py = ev.clientY + margem;

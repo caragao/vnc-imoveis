@@ -45,7 +45,7 @@
 ### Conciliação entre dashboards (ADR-013)
 Ligação em runtime, no navegador, entre a oferta (`imoveis.json`) e as transações (`transacoes.json`) — **nenhum dado é gravado nos JSONs**.
 - `conciliacao.js` — módulo puro compartilhado: reduz um endereço a uma **chave de prédio** (`logradouro normalizado + número`). Usado pelas duas páginas; testável em Node.
-- **Cada página busca os dois JSONs** (fetch não-fatal): `index.html` lê as transações (marca 🧾 prédios com transação em 2025/2026, propagando pelos grupos de duplicados entre fontes); `transacoes.html` lê os imóveis (marca 🏙️ "à venda" e sugere a **área útil** = mediana dos anúncios do prédio).
+- **Cada página busca os dois JSONs** (fetch não-fatal): `index.html` lê as transações (marca 🧾 prédios com transação **residencial de compra e venda** em 2025/2026 — mesmo mercado do default do painel irmão, ADR-012 — propagando pelos grupos de duplicados entre fontes); `transacoes.html` lê os imóveis (marca 🏙️ "à venda" e sugere a **área útil** = mediana dos anúncios do prédio).
 - `area-util.js` — área útil informada pelo usuário na página de transações: localStorage (`vnc-imoveis:areautil`) + export/import, espelhando anotações. **Amenda o ADR-011** (a página de transações passa a ter uma camada local). Nunca commitada.
 
 ## Restrições de projeto
