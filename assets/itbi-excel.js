@@ -10,11 +10,13 @@ function baixarExcelTransacoes(transacoes) {
     "Bairro": t.bairro,
     "CEP": t.cep || "",
     "Natureza": t.natureza,
+    "Tipo de ativo": t.tipo_ativo || "",
+    "Integral (100%)": t.integral ? "sim" : "não",
     "Valor declarado (R$)": t.valor,
     "Proporção (%)": t.proporcao,
-    "Valor 100% (R$)": t.valor_100pct,
+    "Valor equiv. 100% (R$)": t.valor_100pct,
     "Área construída (m²)": t.area_construida_m2 ?? "",
-    "R$/m² (100%)": t.valor_m2 ?? "",
+    "R$/m² equiv.": t.valor_m2 ?? "",
     "Uso (IPTU)": t.descricao_uso || "",
     "Padrão (IPTU)": t.descricao_padrao || "",
     "ACC (ano constr.)": t.acc ?? "",
@@ -26,8 +28,9 @@ function baixarExcelTransacoes(transacoes) {
   const ws = XLSX.utils.json_to_sheet(linhas);
   ws["!cols"] = [
     { wch: 11 }, { wch: 40 }, { wch: 24 }, { wch: 20 }, { wch: 11 }, { wch: 26 },
-    { wch: 16 }, { wch: 10 }, { wch: 16 }, { wch: 14 }, { wch: 12 }, { wch: 40 },
-    { wch: 24 }, { wch: 12 }, { wch: 16 }, { wch: 10 }, { wch: 14 }, { wch: 14 },
+    { wch: 16 }, { wch: 10 }, { wch: 16 }, { wch: 10 }, { wch: 18 }, { wch: 14 },
+    { wch: 12 }, { wch: 40 }, { wch: 24 }, { wch: 12 }, { wch: 16 }, { wch: 10 },
+    { wch: 14 }, { wch: 14 },
   ];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Transações VNC");

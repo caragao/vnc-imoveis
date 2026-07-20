@@ -30,6 +30,12 @@ async function boot() {
   document.getElementById("atualizado-em").textContent =
     `${dados.total} transações · ${fmtData(per.de)} a ${fmtData(per.ate)}`;
 
+  // preenche a seção de metodologia (P2.3)
+  const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  setTxt("m-fonte", dados.fonte || "—");
+  setTxt("m-periodo", `${fmtData(per.de)} a ${fmtData(per.ate)}`);
+  setTxt("m-atualizado", dados.atualizado_em ? fmtData(dados.atualizado_em.slice(0, 10)) : "—");
+
   popularSelects();
   ligarFiltros();
   ligarOrdenacao();
@@ -52,6 +58,10 @@ function popularSelects() {
 
   const padroes = [...new Set(estado.transacoes.map((t) => t.descricao_padrao).filter(Boolean))].sort();
   addOpcoes("f-padrao", padroes.map((p) => [p, p]));
+
+  // segmentação por tipo de ativo (P2.1) — acrescenta os tipos após "residencial"/"todos"
+  const tipos = [...new Set(estado.transacoes.map((t) => t.tipo_ativo).filter(Boolean))].sort();
+  addOpcoes("f-uso", tipos.map((t) => [`tipo:${t}`, t]));
 }
 
 function addOpcoes(selId, pares) {
@@ -91,12 +101,20 @@ function casaBusca(t, termo) {
   return (`${t.endereco} ${t.referencia || ""} ${t.bairro}`).toLowerCase().includes(termo);
 }
 
+// filtro de uso/tipo: "residencial" (unidades de mercado), "" (todos) ou "tipo:X"
+function casaUso(t, uso) {
+  if (uso === "residencial") return t.residencial;
+  if (uso === "" || uso == null) return true;
+  if (uso.startsWith("tipo:")) return t.tipo_ativo === uso.slice(5);
+  return true;
+}
+
 function filtrar() {
   const f = filtrosAtuais();
   return estado.transacoes.filter((t) =>
     (f.ano === null || String(t.ano) === f.ano) &&
     (f.natureza === null || t.natureza === f.natureza) &&
-    (f.uso !== "residencial" || t.residencial) &&
+    casaUso(t, f.uso) &&
     (f.padrao === null || t.descricao_padrao === f.padrao) &&
     (f.areaMin === null || (t.area_construida_m2 ?? -1) >= f.areaMin) &&
     (f.areaMax === null || (t.area_construida_m2 ?? Infinity) <= f.areaMax) &&
@@ -144,12 +162,17 @@ function mediana(nums) {
 
 function renderKpis(vis) {
   const el = document.getElementById("kpis");
-  const comM2 = vis.filter((t) => t.valor_m2);
+  // Metodologia (P1.2): os KPIs de preço só consideram transferências INTEGRAIS
+  // (100% do imóvel) — parciais são frações/heranças/reorganizações, não a compra
+  // da unidade no mercado. As parciais seguem na tabela e são contadas aqui.
+  const integrais = vis.filter((t) => t.integral);
+  const nParciais = vis.length - integrais.length;
+  const comM2 = integrais.filter((t) => t.valor_m2);
   const medM2 = mediana(comM2.map((t) => t.valor_m2));
-  const medArea = mediana(vis.filter((t) => t.area_construida_m2).map((t) => t.area_construida_m2));
-  const valores = vis.map((t) => t.valor);
+  const medArea = mediana(integrais.filter((t) => t.area_construida_m2).map((t) => t.area_construida_m2));
+  const valores = integrais.map((t) => t.valor);
 
-  // tendência: mediana de R$/m² por ano (só onde há amostra)
+  // tendência: mediana de R$/m² equivalente por ano (só integrais com área)
   const anos = [...new Set(comM2.map((t) => t.ano))].sort();
   const porAno = anos.map((a) => [a, mediana(comM2.filter((t) => t.ano === a).map((t) => t.valor_m2))]);
   const trend = porAno.length
@@ -158,12 +181,13 @@ function renderKpis(vis) {
 
   const kpis = [
     { rotulo: "Transações", valor: fmtNum.format(vis.length),
-      compl: `${comM2.length} com R$/m²` },
-    { rotulo: "Mediana R$/m²", valor: medM2 ? fmtBRL.format(medM2) : "—", compl: "ajustado p/ 100%" },
+      compl: `${integrais.length} integrais · ${nParciais} parciais` },
+    { rotulo: "Mediana R$/m²", valor: medM2 ? fmtBRL.format(medM2) : "—",
+      compl: `equivalente 100% · ${comM2.length} integrais c/ área` },
     { rotulo: "R$/m² por ano", valor: porAno.length ? fmtBRL.format(porAno[porAno.length - 1][1] || 0) : "—", compl: trend },
     { rotulo: "Faixa de valor", valor: valores.length ? fmtBRL.format(Math.min(...valores)) : "—",
-      compl: valores.length ? "a " + fmtBRL.format(Math.max(...valores)) : "" },
-    { rotulo: "Mediana de área", valor: medArea ? fmtM2.format(medArea) + " m²" : "—", compl: "área construída" },
+      compl: valores.length ? "a " + fmtBRL.format(Math.max(...valores)) + " (integrais)" : "" },
+    { rotulo: "Mediana de área", valor: medArea ? fmtM2.format(medArea) + " m²" : "—", compl: "integrais, área construída" },
   ];
   el.innerHTML = kpis.map((k) => `
     <div class="kpi">
@@ -210,12 +234,12 @@ function renderScatter(vis) {
   const wrap = document.getElementById("scatter");
   const legenda = document.getElementById("legenda-anos");
   wrap.innerHTML = "";
-  // O gráfico mostra só transações de 100% do imóvel: aí o valor é o preço real da
-  // unidade inteira, sem extrapolação. Transferências parciais, quando estendidas p/
-  // 100% (valor ÷ proporção), explodem para valores absurdos com proporções ínfimas
-  // (0,3% → bilhões) e esmagariam a escala — elas seguem na tabela com o valor ajustado.
+  // O gráfico mostra só transações INTEGRAIS (100% do imóvel): aí o valor declarado
+  // é o da unidade inteira, sem extrapolação. Transferências parciais, quando
+  // estendidas p/ 100% (valor ÷ proporção), explodem para valores absurdos com
+  // proporções ínfimas (0,3% → bilhões) e esmagariam a escala — seguem na tabela.
   const comArea = vis.filter((t) => t.area_construida_m2 && t.valor_m2);
-  const dados = comArea.filter((t) => t.proporcao >= 100);
+  const dados = comArea.filter((t) => t.integral);
   const parciais = comArea.length - dados.length;
   const anosVis = [...new Set(dados.map((t) => t.ano))].sort();
   legenda.innerHTML = anosVis.map((a) =>
@@ -310,8 +334,8 @@ function mostrarTooltip(ev, t) {
     <div class="t-titulo">${escapeHtml(t.endereco)}</div>
     ${t.referencia ? `<div class="t-linha">${escapeHtml(t.referencia)}</div>` : ""}
     <div class="t-linha">${escapeHtml(t.natureza)} · ${fmtData(t.data)}</div>
-    <div class="t-linha">${fmtM2.format(t.area_construida_m2)} m² · ${fmtBRL.format(t.valor_100pct)}${t.proporcao < 100 ? " (100%)" : ""} · ${fmtBRL.format(t.valor_m2)}/m²</div>
-    ${t.proporcao < 100 ? `<div class="t-linha">transf. de ${fmtPct.format(t.proporcao)}% por ${fmtBRL.format(t.valor)}</div>` : ""}
+    <div class="t-linha">${fmtM2.format(t.area_construida_m2)} m² · ${fmtBRL.format(t.valor)}${t.integral ? "" : " (declarado)"} · ${fmtBRL.format(t.valor_m2)}/m² equiv.</div>
+    ${t.integral ? "" : `<div class="t-linha">transf. de ${fmtPct.format(t.proporcao)}% · equiv. 100% = ${fmtBRL.format(t.valor_100pct)}</div>`}
     <div class="t-linha">${escapeHtml(t.descricao_uso || "—")}${t.acc ? " · " + t.acc : ""}</div>`;
   el.hidden = false;
   const margem = 14;
@@ -368,7 +392,7 @@ function renderTabela(vis) {
       <td>${escapeHtml(t.referencia || "—")}</td>
       <td>${escapeHtml(t.natureza)}</td>
       <td class="num">${fmtBRL.format(t.valor)}</td>
-      <td class="num">${parcial ? `<span class="selo-dup" title="Transferência parcial — R$/m² usa o valor extrapolado p/ 100%">${fmtPct.format(t.proporcao)}%</span>` : "100%"}</td>
+      <td class="num">${parcial ? `<span class="selo-dup" title="Transferência parcial — fora dos KPIs; R$/m² usa o valor equivalente a 100% (extrapolado)">${fmtPct.format(t.proporcao)}%</span>` : "100%"}</td>
       <td class="num">${t.area_construida_m2 != null ? fmtM2.format(t.area_construida_m2) : "—"}</td>
       <td class="num">${t.valor_m2 != null ? fmtBRL.format(t.valor_m2) : "—"}</td>
       <td>${escapeHtml(t.descricao_uso || "—")}</td>
@@ -379,7 +403,7 @@ function renderTabela(vis) {
 
   document.getElementById("rodape").textContent =
     `${vis.length} transações exibidas · ordenado por ${estado.ordenacao.col.replace("_", " ")} ` +
-    `(${estado.ordenacao.asc ? "crescente" : "decrescente"}) · R$/m² ajustado para 100% do imóvel`;
+    `(${estado.ordenacao.asc ? "crescente" : "decrescente"}) · R$/m² = valor equivalente a 100% ÷ área`;
 }
 
 // ---------- util ----------

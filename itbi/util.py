@@ -35,20 +35,51 @@ def cep_int(cep) -> int | None:
 # corte em 04515 bate com a extensão real do bairro nos dados (ver docs/ITBI.md).
 CEP_VNC_MIN, CEP_VNC_MAX = 4500000, 4515999
 
+# Ruas de bairros VIZINHOS que aparecem dentro da faixa de CEP ou rotuladas como
+# "Nova Conceição". Servem de blocklist (defesa em profundidade) para que nunca
+# entrem — nem por rótulo errado, nem por contaminar o allowlist de ruas de VNC.
+# Substrings normalizadas (sem prefixo R/AV). Ver docs/ITBI.md.
+#  - Itaim Bibi / Vila Olímpia: CEP 04522+ (já fora da faixa, aqui por garantia).
+#  - Moema / Indianópolis: ruas de nome de ave em 04514/04515, que dividem a faixa
+#    de CEP com VNC (ex.: Av. Lavandisca é VNC e Av. Sabiá é Moema, ambas 04515).
+_RUAS_NAO_VNC = (
+    # Itaim Bibi / Vila Olímpia
+    "JOAO CACHOEIRA", "CLODOMIRO AMAZONAS", "EDUARDO DE SOUZA ARANHA", "FADLO HAIDAR",
+    "GUILHERME BANNITZ", "ATILIO INNOCENTI", "JUSCELINO KUBITSCHEK", "MIGUEL CALFAT",
+    "ALCEU DE CAMPOS RODRIGUES", "JOAQUIM FERREIRA LOBO", "FERNANDES DE ABREU",
+    # Moema / Indianópolis (nomes de ave e adjacências) — dividem CEP com VNC
+    "SABIA", "PINTASSILGO", "TUIM", "JACUTINGA", "GRAUNA", "PERIQUITO", "ARAGUARI",
+    "REPUBLICA DO LIBANO",
+)
 
-def is_vnc(bairro, cep) -> bool:
+
+def cep_em_vnc(cep) -> bool:
+    """CEP dentro da faixa real da Vila Nova Conceição (04500–04515)."""
+    c = cep_int(cep)
+    return c is not None and CEP_VNC_MIN <= c <= CEP_VNC_MAX
+
+
+def rotulo_conceicao(bairro) -> bool:
+    """Rótulo de bairro sugere Vila Nova Conceição, sem cair nos homônimos."""
+    b = normalizar(bairro)
+    tem = "NOVA CONCEICAO" in b or "VNCONCEICAO" in b
+    return tem and not any(t in b for t in _ARMADILHAS)
+
+
+def rua_bloqueada(logradouro) -> bool:
+    """Logradouro está na lista de ruas confirmadas de outro bairro."""
+    r = normalizar(logradouro)
+    return any(rua in r for rua in _RUAS_NAO_VNC)
+
+
+def is_vnc(bairro, cep, logradouro=None) -> bool:
     """True só para Vila Nova Conceição de verdade.
 
-    Dois sinais combinados: rótulo contém 'NOVA CONCEICAO' (ou 'VNCONCEICAO')
-    E o CEP cai na faixa real do bairro (04500–04515) — o que exclui tanto os
-    homônimos (Nossa Senhora 0518x, Sítio 0847x) quanto o vazamento de
-    Itaim/Vila Olímpia (04522+). Rejeita ainda os termos-armadilha por segurança."""
-    b = normalizar(bairro)
-    c = cep_int(cep)
-    cep_ok = c is not None and CEP_VNC_MIN <= c <= CEP_VNC_MAX
-    tem_conceicao = "NOVA CONCEICAO" in b or "VNCONCEICAO" in b
-    armadilha = any(t in b for t in _ARMADILHAS)
-    return tem_conceicao and cep_ok and not armadilha
+    Três sinais: rótulo contém 'NOVA CONCEICAO' E CEP na faixa real do bairro
+    (04500–04515) E o logradouro não está na lista de ruas de outro bairro. O CEP
+    exclui homônimos (Nossa Senhora 0518x, Sítio 0847x) e o vazamento de
+    Itaim/Vila Olímpia (04522+); a lista de ruas é defesa extra (ver docs/ITBI.md)."""
+    return rotulo_conceicao(bairro) and cep_em_vnc(cep) and not rua_bloqueada(logradouro)
 
 
 def fmt_cep(cep) -> str | None:

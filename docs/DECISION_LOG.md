@@ -153,3 +153,23 @@ A análise é **recomputada a cada render sobre o conjunto visível** (uma chama
 **Alternativas rejeitadas:** unir tudo em `imoveis.json`/`index.html` (oferta e transação são naturezas distintas — R$/m² e filtros diferentes; poluiria os dois); commitar os `.xlsx` (peso e crescimento mensal no git); filtrar VNC só pelo Bairro (traria bairros homônimos); usar o valor declarado bruto sem ajuste de proporção (37% das linhas apareceriam artificialmente baratas).
 
 **Consequências:** duas fontes de verdade separadas, cada uma com seu pipeline e página. Atualizar transações é manual (baixar `.xlsx` → `python itbi/build.py` → commit do JSON). A base tem imperfeições inerentes (área construída ausente em ~18%, naturezas não-mercado) — tratadas por normalização e defaults, documentadas em docs/ITBI.md.
+
+---
+
+## ADR-012 — Refino do pipeline ITBI após revisão (geo, metodologia, auditoria)
+**Data:** 2026-07-20 · **Status:** aceito · **Complementa o ADR-011**
+
+**Contexto:** revisão do PR #6 (Codex + ChatGPT) apontou que o ADR-011, apesar de correto na direção, tinha lacunas: (a) a faixa de CEP `045xxxxx` era larga demais e deixava vazar Itaim Bibi/Vila Olímpia rotulados como "Nova Conceição" (74 registros, ~11% da base); (b) a proporção `NaN` do pandas fazia descartar transações em vez de aplicar o default; (c) o cabeçalho `N°` (grau) ≠ `Nº` (ordinal) fazia o SQL virar `"?"` em 100% das linhas; (d) KPIs misturavam transferências parciais extrapoladas com compras integrais; (e) faltava classificação econômica explícita e auditoria.
+
+**Decisão:**
+- **Regra geográfica final (centralizada em `itbi/util.py`):** VNC = CEP na faixa real `04500-000`–`04515-999` **E** rótulo "Nova Conceição" (sem homônimos) **E** logradouro fora de uma lista de ruas confirmadas de Itaim/Vila Olímpia (defesa em profundidade). O perímetro `04515` vem do corte limpo observado nos dados (VNC vai até `04515`; `04522+` é Itaim/VO). Não confiar no campo Bairro isolado.
+- **Registros ambíguos nunca entram por default:** CEP na faixa VNC mas rótulo divergente é contado como "revisar" na auditoria, não incluído.
+- **Auditoria obrigatória** no `build.py` a cada execução: brutas, aceitas, excluídas por CEP/rua, ambíguas, CEPs aceitos com contagem, ruas excluídas, quantos usaram default de proporção e o delta vs o JSON anterior. `validate_data.py` reporta composição por natureza/tipo de ativo/padrão/proporção/área.
+- **Cabeçalhos casados por forma normalizada** (`_norm_header`, tolerante a acento/º/°/espaço), não por igualdade exata.
+- **Inclusão residencial explícita (não por percentil):** KPIs/scatter padrão = unidades residenciais de mercado (uso IPTU 20 apartamento, 25 flat, 10 casa), **excluindo** cadastro de prédio inteiro (uso 21), vagas, depósitos, lojas, escritórios e terrenos. Campo `tipo_ativo` derivado do uso permite segmentar.
+- **Transferências parciais fora dos indicadores padrão:** KPIs e scatter só usam transferências **integrais (100%)**; parciais ficam na tabela. Nomenclatura corrigida para `valor equivalente a 100%` / `extrapolado` (não "preço real da unidade").
+- **Metodologia visível:** seção "Metodologia e limitações" no dashboard; comparação oferta×realizado permanece **não** implementada (exigiria controle por área/tipo/idade/padrão etc.).
+
+**Alternativas rejeitadas:** manter a faixa larga de CEP com validação só por rótulo (vaza bairros vizinhos); usar corte por percentil no lugar de classificação econômica (esconde o problema, não classifica); descartar linhas com proporção ausente (perde dados válidos).
+
+**Consequências:** a base cai de ~396 para ~322 transações (remoção do vazamento), e os KPIs passam a refletir só compras integrais de unidades residenciais — números menores porém defensáveis. A cada atualização mensal, conferir a auditoria do `build.py` (CEPs novos, ambíguos, ruas) antes de commitar o JSON.

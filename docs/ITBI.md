@@ -60,21 +60,32 @@ Campos derivados (única fonte de verdade em `models.novo`): `valor_100pct = val
 
 Vários rótulos contêm "Conceição" mas são **outros bairros**:
 
-| Rótulo | CEP | É VNC? |
-|---|---|---|
-| VILA NOVA CONCEICAO / VL NOVA CONCEICAO / V NOVA CONCEICAO / VNCONCEICAO | `04505`–`04515` | **sim** |
-| VL N S CONCEICAO / VL N SRA CONCEICAO (Vila **Nossa Senhora** da Conceição) | `0518xxxx` | não |
-| SITIO CONCEICAO / CJ HAB SITIO CONCEICAO | `0847xxxx` | não |
-| VL/V NOVA CONCEICAO em `04522`+ (Av. JK, Souza Aranha, Fadlo Haidar, João Cachoeira...) | `04522`–`04545` | **não** (Itaim/Vila Olímpia) |
+O campo `Bairro` é preenchido pelo contribuinte e falha **nos dois sentidos**:
 
-**Filtro (`util.is_vnc`)**: rótulo normalizado contém `NOVA CONCEICAO` (ou `VNCONCEICAO`)
-**E** CEP na faixa **real do bairro `04500-000`–`04515-999`** **E** não contém termo-armadilha
-(`N S`/`N SRA`/`SITIO`/`CAMPANH`). A faixa larga `045xxxxx` **não** serve: `04522+` já é Itaim
-Bibi/Vila Olímpia, e muitos desses endereços vêm rotulados como "Nova Conceição" na declaração
-(o `Bairro` é preenchido pelo contribuinte). Nos dados há um corte limpo — VNC vai de `04505` a
-`04515`; de `04522` (Cel Raul Humaitá) em diante são ruas de Itaim/VO (Av. JK, Dr. Eduardo de
-Souza Aranha, Fadlo Haidar, João Cachoeira, Clodomiro Amazonas, Guilherme Bannitz). O
-`validate_data.py` confere que nenhum CEP fora da faixa VNC passou.
+- **Inclui demais:** rotula como "Nova Conceição" endereços de Itaim Bibi/Vila Olímpia (`04522`+:
+  Av. JK, Dr. Eduardo de Souza Aranha, Fadlo Haidar, João Cachoeira…) e de Vila **Nossa Senhora**
+  da Conceição (`0518x`) e Sítio Conceição (`0847x`).
+- **Exclui demais:** ~1600 transações em ruas nitidamente de VNC (Afonso Braz, Jacques Felix,
+  Diogo Jácome…) vêm com o bairro rotulado de outra forma (em branco, "Moema", etc.).
+
+Por isso **não se usa o rótulo para incluir** — o critério é **CEP + logradouro** (ADR-012):
+
+1. **Faixa de CEP:** `04500-000`–`04515-999` (a faixa larga `045xxxxx` pega Itaim/VO em `04522+`).
+   Mas o CEP sozinho não basta: `04514`/`04515` são **compartilhados** com Moema (ruas de nome de
+   ave: Sabiá, Pintassilgo, Tuim, Jacutinga…) — Av. Lavandisca (VNC) e Av. Sabiá (Moema) são ambas
+   `04515`. Só o logradouro separa.
+2. **Allowlist de logradouros (`build.py`, 2 passagens):** semeia-se o conjunto de ruas que
+   aparecem com rótulo "Nova Conceição" **e** CEP na faixa (alta confiança, ~31 ruas). Inclui-se
+   então **todo** registro na faixa cujo logradouro está no allowlist — independentemente do
+   rótulo. Isso recupera as ~900 transações de VNC que o rótulo escondia.
+3. **Blocklist (`util._RUAS_NAO_VNC`):** ruas confirmadas de bairro vizinho (Itaim/VO e as de ave
+   de Moema) nunca entram, nem no allowlist.
+4. **Ambíguos:** CEP na faixa mas logradouro **não** confirmado (ex.: Correia de Oliveira,
+   Natividade) → **não** são incluídos; ficam listados na auditoria do `build.py` para revisão
+   manual. Nunca se aceita ambíguo por default.
+
+O `validate_data.py` confere que nenhum CEP fora de `04500`–`04515` passou, e o `build.py` imprime
+a auditoria completa (allowlist, aceitas, excluídas por CEP/rua, ambíguas, delta vs JSON anterior).
 
 ## Armadilha nº 2 — transferências parciais distorcem R$/m²
 

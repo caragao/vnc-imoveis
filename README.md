@@ -67,7 +67,7 @@ index.html                   dashboard (servido pelo GitHub Pages)
 assets/                      JS/CSS do dashboard (vanilla, sem build)
 data/imoveis.json            dados raspados (gerado pelo scraper)
 data/anotacoes.example.json  formato do backup de anotações (fictício; o real nunca é commitado)
-index2 (transacoes.html)     dashboard de transações ITBI (mesmos assets)
+transacoes.html              dashboard de transações ITBI (mesmos assets)
 data/transacoes.json         transações de VNC (gerado por itbi/build.py)
 scraper/                     coletor Python (um módulo por site) + validate_data.py + testes
 itbi/                        pipeline das planilhas de ITBI (build/validate/models + testes)
@@ -84,7 +84,9 @@ Leia o [CLAUDE.md](CLAUDE.md) antes de contribuir. Regras principais: todo traba
 Além da **oferta** (imóveis à venda), o projeto tem um dashboard das **transações que
 efetivamente ocorreram** em VNC, a partir dos dados públicos de **ITBI-IV da Prefeitura de SP**
 (`transacoes.html`, linkado no topo do dashboard principal). Mostra valor realizado × área
-construída (cor por ano), com filtros de natureza, uso, área, valor, R$/m² e ano de construção.
+construída (cor por ano), com filtros de natureza, tipo de ativo, área, valor, R$/m² e ano de
+construção, e uma seção "Metodologia e limitações". Os KPIs de preço usam só transferências
+**integrais** (100%) de **unidades residenciais** — ver [docs/ITBI.md](docs/ITBI.md).
 
 Pipeline independente em `itbi/` (as planilhas brutas da Prefeitura **não** são commitadas —
 ver ADR-011; só o `data/transacoes.json` derivado entra no repo):

@@ -5,7 +5,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from models import novo, USOS_RESIDENCIAIS  # noqa: E402
-from util import fmt_cep, is_vnc, normalizar, texto, inteiro  # noqa: E402
+from util import fmt_cep, is_vnc, normalizar, texto, inteiro, rua_bloqueada  # noqa: E402
 from build import _proporcao  # noqa: E402
 
 
@@ -76,9 +76,13 @@ class TestProporcao(unittest.TestCase):
         self.assertEqual(_proporcao(150), 100.0)
         self.assertEqual(_proporcao("nao numero"), 100.0)
 
-    def test_nan_do_pandas_vira_100(self):
-        # célula Excel vazia chega como float('nan') — não pode ser descartada
+    def test_nan_e_infinito_do_pandas_viram_100(self):
+        # célula Excel vazia chega como float('nan'); ±inf também não pode passar
         self.assertEqual(_proporcao(float("nan")), 100.0)
+        self.assertEqual(_proporcao(float("inf")), 100.0)
+        self.assertEqual(_proporcao(float("-inf")), 100.0)
+        self.assertEqual(_proporcao("   "), 100.0)
+        self.assertEqual(_proporcao(-10), 100.0)
 
 
 class TestNovaTransacao(unittest.TestCase):
@@ -102,14 +106,46 @@ class TestNovaTransacao(unittest.TestCase):
         t = novo(**self.BASE)
         self.assertEqual((t.ano, t.mes), (2025, 8))
 
-    def test_flag_residencial(self):
+    def test_flag_residencial_exclui_predio_inteiro(self):
         self.assertTrue(novo(**{**self.BASE, "uso": 20}).residencial)   # apartamento
+        self.assertTrue(novo(**{**self.BASE, "uso": 25}).residencial)   # flat
+        self.assertTrue(novo(**{**self.BASE, "uso": 10}).residencial)   # casa
+        self.assertFalse(novo(**{**self.BASE, "uso": 21}).residencial)  # prédio INTEIRO — fora
         self.assertFalse(novo(**{**self.BASE, "uso": 40}).residencial)  # loja
-        self.assertEqual(USOS_RESIDENCIAIS, {10, 20, 21, 25})
+        self.assertEqual(USOS_RESIDENCIAIS, {10, 20, 25})
+
+    def test_tipo_ativo(self):
+        self.assertEqual(novo(**{**self.BASE, "uso": 20}).tipo_ativo, "Apartamento")
+        self.assertEqual(novo(**{**self.BASE, "uso": 25}).tipo_ativo, "Flat")
+        self.assertEqual(novo(**{**self.BASE, "uso": 10}).tipo_ativo, "Casa")
+        self.assertEqual(novo(**{**self.BASE, "uso": 24}).tipo_ativo, "Vaga de garagem")
+        self.assertEqual(novo(**{**self.BASE, "uso": 0}).tipo_ativo, "Terreno")
+        self.assertEqual(novo(**{**self.BASE, "uso": None}).tipo_ativo, "Não classificado")
+
+    def test_flag_integral(self):
+        self.assertTrue(novo(**{**self.BASE, "proporcao": 100.0}).integral)
+        self.assertFalse(novo(**{**self.BASE, "proporcao": 50.0}).integral)
 
     def test_razao_valor_venal(self):
         t = novo(**{**self.BASE, "valor": 800_000, "valor_venal_referencia": 400_000})
         self.assertEqual(t.razao_valor_venal, 2.0)
+
+
+class TestRuaBloqueada(unittest.TestCase):
+    def test_ruas_de_itaim_vila_olimpia_bloqueadas(self):
+        for rua in ["R JOAO CACHOEIRA", "R CLODOMIRO AMAZONAS",
+                    "R DR EDUARDO DE SOUZA ARANHA", "R DR FADLO HAIDAR",
+                    "AV PRES JUSCELINO KUBITSCHEK"]:
+            self.assertTrue(rua_bloqueada(rua), f"deveria bloquear {rua}")
+
+    def test_ruas_de_vnc_nao_bloqueadas(self):
+        for rua in ["R AFONSO BRAZ", "R JACQUES FELIX", "R DOMINGOS FERNANDES", None]:
+            self.assertFalse(rua_bloqueada(rua), f"não deveria bloquear {rua}")
+
+    def test_is_vnc_bloqueia_rua_mesmo_com_cep_e_rotulo(self):
+        # defesa extra: rótulo VNC + CEP na faixa, mas rua de Itaim -> rejeita
+        self.assertFalse(is_vnc("VILA NOVA CONCEICAO", 4510000, "R JOAO CACHOEIRA"))
+        self.assertTrue(is_vnc("VILA NOVA CONCEICAO", 4510000, "R AFONSO BRAZ"))
 
 
 if __name__ == "__main__":

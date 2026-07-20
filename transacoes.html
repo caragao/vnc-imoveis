@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Transações ITBI · Vila Nova Conceição</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧾</text></svg>">
-<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/style.css?v=2">
 </head>
 <body>
 <header class="topo">
@@ -29,9 +29,9 @@
     <select id="f-natureza"><option value="">todas</option></select>
   </div>
   <div class="filtro">
-    <label for="f-uso">Uso (IPTU)</label>
+    <label for="f-uso">Uso / tipo</label>
     <select id="f-uso">
-      <option value="residencial">residencial</option>
+      <option value="residencial">residencial (unidades)</option>
       <option value="">todos</option>
     </select>
   </div>
@@ -118,10 +118,29 @@
   <p class="rodape" id="rodape"></p>
 </section>
 
+<section class="metodologia">
+  <details>
+    <summary>Metodologia e limitações</summary>
+    <div class="metod-corpo">
+      <p><strong>Fonte:</strong> <span id="m-fonte"></span>. <strong>Período (data de transação):</strong> <span id="m-periodo"></span>. <strong>Atualizado em:</strong> <span id="m-atualizado"></span>.</p>
+      <ul>
+        <li><strong>Critério geográfico:</strong> só Vila Nova Conceição — CEP <code>04500-000</code> a <code>04515-999</code> <em>e</em> rótulo de bairro "Nova Conceição" <em>e</em> logradouro fora da lista de ruas de Itaim/Vila Olímpia. O campo Bairro sozinho é preenchido pelo contribuinte e mistura bairros homônimos; endereços de Itaim/Vila Olímpia rotulados como "Nova Conceição" (Av. JK, Souza Aranha, Fadlo Haidar…) são excluídos.</li>
+        <li><strong>Mercado residencial (default):</strong> unidades autônomas — apartamento, flat e casa (uso IPTU 20/25/10). Exclui de propósito o cadastro de <em>prédio inteiro</em> (uso 21, área do edifício), vagas, depósitos, lojas, escritórios e terrenos. Filtre "todos" ou um tipo específico para ver os demais.</li>
+        <li><strong>Transferências parciais:</strong> proporção &lt; 100% (fração ideal, herança, doação, reorganização societária) <em>não</em> entram nos KPIs nem no gráfico — não representam a compra de uma unidade no mercado. Ficam na tabela, com a proporção marcada.</li>
+        <li><strong>Valor equivalente a 100%:</strong> para as parciais, <code>valor_equivalente_100% = valor_declarado ÷ proporção_transferida</code>. É uma <em>extrapolação matemática</em>, não necessariamente o preço de mercado da unidade completa; por isso fica fora dos indicadores padrão.</li>
+        <li><strong>Proporção ausente:</strong> quando a planilha não traz a proporção, assume-se 100% (a transação é tratada como integral). A auditoria do <code>build.py</code> conta quantos registros receberam esse default.</li>
+        <li><strong>R$/m²:</strong> usa a <em>área construída</em> (IPTU). ~18% das linhas não têm área (terrenos/cadastro incompleto) e ficam sem R$/m² e fora do gráfico. Raros cadastros prediais (área do prédio inteiro) são cortados do gráfico pela rede de segurança de escala.</li>
+        <li><strong>Ano:</strong> vem da <em>data de transação</em> (celebração do instrumento), não do mês de pagamento da guia.</li>
+        <li><strong>Comparação com anúncios (oferta):</strong> este painel <em>não</em> compara diretamente com o dashboard de imóveis à venda. Uma comparação defensável exigiria controlar por área, tipo, localização fina, idade, padrão, período e vagas — ver docs/ITBI.md.</li>
+      </ul>
+    </div>
+  </details>
+</section>
+
 <div class="tooltip" id="tooltip" hidden></div>
 
 <script src="assets/vendor/xlsx.min.js"></script>
-<script src="assets/itbi-excel.js"></script>
-<script src="assets/itbi.js"></script>
+<script src="assets/itbi-excel.js?v=2"></script>
+<script src="assets/itbi.js?v=2"></script>
 </body>
 </html>
