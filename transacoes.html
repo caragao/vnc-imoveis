@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Transações ITBI · Vila Nova Conceição</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧾</text></svg>">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="topo">
+  <div>
+    <h1>Transações imobiliárias (ITBI) · Vila Nova Conceição</h1>
+    <p class="sub">Prefeitura de SP · ITBI-IV — <span id="atualizado-em"></span></p>
+    <p class="sub"><a class="nav-link" href="index.html">← imóveis à venda (corretoras)</a></p>
+  </div>
+  <div class="topo-acoes" id="topo-acoes">
+    <button class="acao acao-primaria" id="btn-excel" type="button">⬇ Baixar Excel</button>
+  </div>
+</header>
+
+<section class="filtros" aria-label="Filtros">
+  <div class="filtro">
+    <label for="f-ano">Ano</label>
+    <select id="f-ano"><option value="">todos</option></select>
+  </div>
+  <div class="filtro">
+    <label for="f-natureza">Natureza</label>
+    <select id="f-natureza"><option value="">todas</option></select>
+  </div>
+  <div class="filtro">
+    <label for="f-uso">Uso (IPTU)</label>
+    <select id="f-uso">
+      <option value="residencial">residencial</option>
+      <option value="">todos</option>
+    </select>
+  </div>
+  <div class="filtro">
+    <label for="f-padrao">Padrão</label>
+    <select id="f-padrao"><option value="">todos</option></select>
+  </div>
+  <div class="filtro">
+    <label>Área constr. (m²)</label>
+    <div class="faixa">
+      <input type="number" id="f-area-min" placeholder="mín" min="0" inputmode="numeric">
+      <span>–</span>
+      <input type="number" id="f-area-max" placeholder="máx" min="0" inputmode="numeric">
+    </div>
+  </div>
+  <div class="filtro">
+    <label>Valor (R$ mil)</label>
+    <div class="faixa">
+      <input type="number" id="f-valor-min" placeholder="mín" min="0" inputmode="numeric">
+      <span>–</span>
+      <input type="number" id="f-valor-max" placeholder="máx" min="0" inputmode="numeric">
+    </div>
+  </div>
+  <div class="filtro">
+    <label>R$/m² (mil)</label>
+    <div class="faixa">
+      <input type="number" id="f-pm2-min" placeholder="mín" min="0" step="0.5" inputmode="decimal">
+      <span>–</span>
+      <input type="number" id="f-pm2-max" placeholder="máx" min="0" step="0.5" inputmode="decimal">
+    </div>
+  </div>
+  <div class="filtro">
+    <label>Ano constr. (ACC)</label>
+    <div class="faixa">
+      <input type="number" id="f-acc-min" placeholder="de" min="0" inputmode="numeric">
+      <span>–</span>
+      <input type="number" id="f-acc-max" placeholder="até" min="0" inputmode="numeric">
+    </div>
+  </div>
+  <div class="filtro">
+    <label for="f-busca">Rua / prédio</label>
+    <input type="text" id="f-busca" placeholder="buscar..." style="width:150px">
+  </div>
+  <div class="filtro">
+    <label class="chk-eixo" for="f-100"><input type="checkbox" id="f-100"> só proporção 100%</label>
+  </div>
+  <button class="limpar" id="btn-limpar" type="button">Limpar filtros</button>
+</section>
+
+<section class="kpis" id="kpis" aria-label="Indicadores"></section>
+
+<section class="viz">
+  <div class="scatter-wrap">
+    <div class="scatter-head">
+      <h2>Valor × área construída <span class="h2-sub">(transações de 100% do imóvel · cor por ano)</span></h2>
+      <div style="display:flex; gap:14px; align-items:center; flex-wrap:wrap">
+        <span class="legenda" id="legenda-anos"></span>
+        <label class="chk-eixo"><input type="checkbox" id="chk-zero"> iniciar eixos no zero</label>
+      </div>
+    </div>
+    <div id="scatter"></div>
+  </div>
+</section>
+
+<section class="tabela-wrap">
+  <table id="tabela">
+    <thead>
+      <tr>
+        <th data-col="data">Data</th>
+        <th data-col="endereco" class="col-titulo">Endereço</th>
+        <th data-col="referencia">Referência</th>
+        <th data-col="natureza">Natureza</th>
+        <th data-col="valor" class="num">Valor</th>
+        <th data-col="proporcao" class="num">Prop.</th>
+        <th data-col="area_construida_m2" class="num">Área m²</th>
+        <th data-col="valor_m2" class="num">R$/m²</th>
+        <th data-col="descricao_uso">Uso (IPTU)</th>
+        <th data-col="descricao_padrao">Padrão</th>
+        <th data-col="acc" class="num">ACC</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+  <p class="rodape" id="rodape"></p>
+</section>
+
+<div class="tooltip" id="tooltip" hidden></div>
+
+<script src="assets/vendor/xlsx.min.js"></script>
+<script src="assets/itbi-excel.js"></script>
+<script src="assets/itbi.js"></script>
+</body>
+</html>

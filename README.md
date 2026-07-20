@@ -67,14 +67,36 @@ index.html                   dashboard (servido pelo GitHub Pages)
 assets/                      JS/CSS do dashboard (vanilla, sem build)
 data/imoveis.json            dados raspados (gerado pelo scraper)
 data/anotacoes.example.json  formato do backup de anotações (fictício; o real nunca é commitado)
+index2 (transacoes.html)     dashboard de transações ITBI (mesmos assets)
+data/transacoes.json         transações de VNC (gerado por itbi/build.py)
 scraper/                     coletor Python (um módulo por site) + validate_data.py + testes
+itbi/                        pipeline das planilhas de ITBI (build/validate/models + testes)
 tests/js/                    testes da camada de anotações (Node puro)
-docs/                        arquitetura, decision log (ADRs), notas dos scrapers
+docs/                        arquitetura, decision log (ADRs), notas dos scrapers e do ITBI
 ```
 
 ## Para revisores e agentes (Claude, ChatGPT, etc.)
 
 Leia o [CLAUDE.md](CLAUDE.md) antes de contribuir. Regras principais: todo trabalho em branch + PR, decisões de arquitetura registradas em [docs/DECISION_LOG.md](docs/DECISION_LOG.md), mudanças em seletores documentadas em [docs/SCRAPERS.md](docs/SCRAPERS.md).
+
+## Segundo dashboard: transações fechadas (ITBI)
+
+Além da **oferta** (imóveis à venda), o projeto tem um dashboard das **transações que
+efetivamente ocorreram** em VNC, a partir dos dados públicos de **ITBI-IV da Prefeitura de SP**
+(`transacoes.html`, linkado no topo do dashboard principal). Mostra valor realizado × área
+construída (cor por ano), com filtros de natureza, uso, área, valor, R$/m² e ano de construção.
+
+Pipeline independente em `itbi/` (as planilhas brutas da Prefeitura **não** são commitadas —
+ver ADR-011; só o `data/transacoes.json` derivado entra no repo):
+
+```bash
+# baixar os .xlsx do portal ITBI-IV e colocar em itbi/raw/
+cd itbi && pip install -r requirements.txt
+python build.py            # gera ../data/transacoes.json (só Vila Nova Conceição)
+python validate_data.py    # relatório de qualidade + validação de schema
+```
+
+Detalhes de colunas, filtro de bairro e quirks: [docs/ITBI.md](docs/ITBI.md).
 
 ## Evoluções futuras (registradas, não implementadas)
 

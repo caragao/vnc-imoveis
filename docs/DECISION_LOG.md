@@ -133,3 +133,23 @@ A análise é **recomputada a cada render sobre o conjunto visível** (uma chama
 **Alternativas rejeitadas:** deduplicar no scraper apagando linhas (perde dados complementares e é irreversível no JSON); colapsar grupos em uma linha só (esconde anúncios que o usuário pode querer abrir).
 
 **Consequências:** KPIs deixam de inflar; o usuário ainda vê e abre cada anúncio. A chave é sensível a arredondamento de área — casos com área ligeiramente diferente entre fontes podem escapar (aceitável para um diagnóstico visual).
+
+---
+
+## ADR-011 — Segundo dashboard: transações fechadas via ITBI da Prefeitura
+**Data:** 2026-07-19 · **Status:** aceito
+
+**Contexto:** o dashboard existente mostra a **oferta** (imóveis à venda anunciados pelas corretoras). Falta o outro lado: o **preço realizado** das transações que de fato ocorreram, para avaliar o valor de mercado em VNC em função de tamanho, localização e ano do imóvel. A Prefeitura de SP publica os dados de ITBI-IV (uma linha por DTI paga) em planilhas `.xlsx` anuais.
+
+**Decisão:** criar uma **segunda camada de dados independente**, reaproveitando os padrões dos ADR-002/003/007:
+- Pipeline Python em `itbi/` (irmão de `scraper/`): `build.py` lê os `.xlsx` brutos, filtra Vila Nova Conceição, normaliza via Pydantic (`itbi/models.py`) e grava `data/transacoes.json` (envelope `{atualizado_em, fonte, periodo, total, transacoes}`). `validate_data.py` reporta qualidade + valida schema.
+- Página estática nova `transacoes.html` + `assets/itbi.js` (+ `assets/itbi-excel.js`), espelhando o dashboard de imóveis: KPIs, scatter SVG (valor × área construída, cor por ano), tabela ordenável, filtros e download `.xlsx`. **Sem camada de anotações** (dado público, read-only). Navegação recíproca com `index.html`.
+- **Filtro VNC por CEP `045xxxxx` + rótulo**, não só pelo campo Bairro (que mistura Vila Nossa Senhora da Conceição e Sítio Conceição — ver docs/ITBI.md).
+- **Transferências parciais (proporção <100%, ~37%) ajustadas para 100%** (`valor ÷ proporção`) como métrica principal de R$/m²; coluna de proporção + filtro "só 100%".
+- **Ano da análise vem da Data de Transação**, não do mês de pagamento da guia.
+- Default do dashboard = **mercado residencial** (natureza "Compra e venda" + uso 10/20/21/25); tudo filtrável.
+- **Planilhas brutas NUNCA commitadas** (~65 MB, atualizadas mensalmente): `itbi/raw/` e `*.xlsx` no `.gitignore`. Só o JSON derivado entra no repo (espelha o ADR-002).
+
+**Alternativas rejeitadas:** unir tudo em `imoveis.json`/`index.html` (oferta e transação são naturezas distintas — R$/m² e filtros diferentes; poluiria os dois); commitar os `.xlsx` (peso e crescimento mensal no git); filtrar VNC só pelo Bairro (traria bairros homônimos); usar o valor declarado bruto sem ajuste de proporção (37% das linhas apareceriam artificialmente baratas).
+
+**Consequências:** duas fontes de verdade separadas, cada uma com seu pipeline e página. Atualizar transações é manual (baixar `.xlsx` → `python itbi/build.py` → commit do JSON). A base tem imperfeições inerentes (área construída ausente em ~18%, naturezas não-mercado) — tratadas por normalização e defaults, documentadas em docs/ITBI.md.
