@@ -173,3 +173,26 @@ A análise é **recomputada a cada render sobre o conjunto visível** (uma chama
 **Alternativas rejeitadas:** manter a faixa larga de CEP com validação só por rótulo (vaza bairros vizinhos); usar corte por percentil no lugar de classificação econômica (esconde o problema, não classifica); descartar linhas com proporção ausente (perde dados válidos).
 
 **Consequências:** a base cai de ~396 para ~322 transações (remoção do vazamento), e os KPIs passam a refletir só compras integrais de unidades residenciais — números menores porém defensáveis. A cada atualização mensal, conferir a auditoria do `build.py` (CEPs novos, ambíguos, ruas) antes de commitar o JSON.
+
+---
+
+## ADR-013 — Conciliação entre os dashboards de venda e de transações (por prédio)
+**Data:** 2026-07-20 · **Status:** aceito · **Complementa/amenda o ADR-011**
+
+**Contexto:** os dois dashboards eram totalmente independentes (oferta em `index.html`/`imoveis.json`; transações fechadas em `transacoes.html`/`transacoes.json`). O dono quer ligá-los pelo endereço para: (1) marcar em ambos os prédios que tiveram transação recente **e** têm imóvel à venda; (2) trazer área útil e R$/m² útil para o dashboard de transações (que só tem **área construída** do IPTU); (3) informar a área útil manualmente onde não houver conciliação.
+
+**Realidade dos dados que condiciona o desenho:**
+- Só os anúncios da **VNC** trazem endereço coletado (226 de 512); Anglo/PH15 não têm.
+- Os anúncios **não têm número de apartamento** (só logradouro + número do prédio), enquanto a transação tem (`complemento` = "AP 82"). Logo **não é possível casar transação ↔ unidade específica**, só transação ↔ **prédio**. Além disso a **área construída (IPTU) ≠ área útil (privativa)** e não há razão constante; vagas de garagem convivem no mesmo prédio.
+- Arquitetura do projeto: sem build step, JSONs de escritor único e **sobrescritos por completo** a cada execução, repo/Pages **públicos**.
+
+**Decisão:**
+- **Conciliação client-side por chave de prédio** = logradouro normalizado (sem acento/caixa/prefixo de tipo) + número, em `assets/conciliacao.js` (módulo puro compartilhado, testável em Node). Cada página passa a buscar **os dois** JSONs (`fetch` não-fatal): a de venda lê `transacoes.json`, a de transações lê `imoveis.json`. Nada é gravado nos JSONs — a marcação é derivada em runtime, então sobrevive à sobrescrita dos pipelines e respeita o escritor único.
+- **Marca de transação recente = transação RESIDENCIAL de COMPRA E VENDA em 2025 ou 2026** — o mesmo mercado do default do painel de transações (uso 10/20/25 + natureza "Compra e venda", ADR-012), para os dois painéis baterem: vaga de garagem/loja (uso não residencial) e transferências não-mercado (herança, doação) **não** marcam, senão o painel de venda diria "teve transação" para um prédio cujo único negócio some do painel irmão sob o filtro padrão. No dashboard de venda, selo 🧾 com link para a transação; no de transações, selo 🏙️ "à venda".
+- **Propagação pelos grupos de duplicados entre fontes:** só a VNC tem endereço, então o eco de Anglo/PH15 (mesmo bucket área+preço do `analisarDuplicados`) **herda a chave do irmão VNC** e também exibe o selo. As estatísticas contam o prédio **uma vez por grupo** (via `dup.manter`), nunca as linhas-eco.
+- **Fallback de endereço via anotações:** anúncios sem endereço coletado usam o `endereco_completo` que o usuário digitou (mesmo localStorage compartilhado entre as páginas).
+- **Área útil no dashboard de transações — híbrido (sugestão + override manual):** a coluna é preenchida com a **mediana da área útil dos anúncios do mesmo prédio** (só para transações residenciais), marcada como *ref.* (aproximada); o usuário pode **sobrescrever por transação**. O **R$/m² útil** (marcado com `~`) = `valor equivalente a 100% ÷ área útil`. A área útil manual vive em **localStorage + export/import** (`assets/area-util.js`, chave `vnc-imoveis:areautil`), espelhando o padrão de anotações do ADR-008 — **nunca** gravada em `transacoes.json`. **Isto amenda o ADR-011**, que dizia "sem camada de anotações" na página de transações: passa a existir uma camada local de área útil (dado não sensível, mas mantido fora do repo pelo mesmo motivo de escritor único).
+
+**Alternativas rejeitadas:** casar transação ↔ **unidade** (impossível sem o número do apartamento nos anúncios); preencher a área útil automaticamente sem marca de aproximação (erra muito em prédios com poucos anúncios — ex.: 1 anúncio de 42 m² para transações de 85 m²); gravar as flags de conciliação nos JSONs (quebra o escritor único e é apagado na próxima execução do pipeline); fazer a conciliação em Python no build (idem, e os JSONs são independentes por natureza — ADR-011).
+
+**Consequências:** ~60 prédios ligam transações de 2025/2026 a imóveis à venda. Nenhum pipeline Python muda; a conciliação é 100% front-end. A área útil de transação é sempre **aproximada** (nível de prédio) salvo override manual — a metodologia do dashboard deixa isso explícito. As duas páginas agora dependem uma do JSON da outra em runtime (degradam sem erro se o outro faltar).

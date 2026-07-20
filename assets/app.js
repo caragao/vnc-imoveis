@@ -20,6 +20,10 @@ const estado = {
   ordenacao: { col: "preco_m2", asc: true },
   anotacoes: {},
   editando: null, // id do imóvel com painel de edição aberto
+  // conciliação com transações ITBI (ADR-013): Map(chave de prédio -> {qtde, anos})
+  // só com transações de 2025/2026; e Map(id do imóvel -> chave de prédio).
+  transacoesPorPredio: new Map(),
+  chavePredio: new Map(),
 };
 
 // chave de duplicidade: mesma área arredondada + mesmo preço.
@@ -104,6 +108,9 @@ async function boot() {
     console.warn("anotações indisponíveis, seguindo somente leitura", e);
     estado.anotacoes = {};
   }
+  // conciliação: transações fechadas por prédio (2025/2026) — nunca fatal
+  await carregarTransacoes();
+  recomputarChavesPredio();
   const dt = new Date(dados.atualizado_em);
   document.getElementById("atualizado-em").textContent =
     "dados de " + dt.toLocaleDateString("pt-BR") + " " +
@@ -125,13 +132,71 @@ async function boot() {
   document.dispatchEvent(new CustomEvent("dashboard:pronto"));
 }
 
+// ---------- conciliação com transações ITBI (ADR-013) ----------
+async function carregarTransacoes() {
+  try {
+    const resp = await fetch("data/transacoes.json");
+    const dados = await resp.json();
+    // Marca só transações recentes (2025/2026) do MERCADO RESIDENCIAL DE COMPRA E
+    // VENDA — o mesmo default do painel de transações (ADR-012). Assim todo prédio
+    // marcado aqui tem uma transação visível lá: garagem/loja (uso não residencial)
+    // e transferências não-mercado (herança/doação) ficam de fora, evitando marcar
+    // "teve transação" quando o único negócio no prédio some do painel irmão.
+    const recentes = (dados.transacoes || []).filter((t) =>
+      (t.ano === 2025 || t.ano === 2026) &&
+      t.residencial &&
+      (t.natureza || "").includes("Compra e venda")
+    );
+    const idx = Conciliacao.indexarPorPredio(recentes, Conciliacao.chaveTransacao);
+    estado.transacoesPorPredio = new Map();
+    for (const [chave, arr] of idx) {
+      estado.transacoesPorPredio.set(chave, {
+        qtde: arr.length,
+        anos: [...new Set(arr.map((t) => t.ano))].sort(),
+      });
+    }
+  } catch (e) {
+    console.warn("transações indisponíveis, seguindo sem marca de transação", e);
+    estado.transacoesPorPredio = new Map();
+  }
+}
+
+// Chave de prédio por imóvel, com PROPAGAÇÃO dentro de cada bucket de duplicados:
+// só a VNC traz endereço, então o eco de Anglo/PH15 (mesma área+preço) herda a
+// chave do irmão VNC e passa a exibir a marca de transação (ADR-013). Recomputado
+// sobre TODOS os imóveis (não só os visíveis) para o filtro e a marca baterem.
+function recomputarChavesPredio() {
+  const chaveDe = new Map();
+  for (const im of estado.imoveis) {
+    chaveDe.set(im.id, Conciliacao.chaveImovel(im, estado.anotacoes[im.id]));
+  }
+  for (const grupo of agruparPorChave(estado.imoveis).values()) {
+    const comChave = grupo.map((im) => chaveDe.get(im.id)).find(Boolean);
+    if (!comChave) continue;
+    for (const im of grupo) if (!chaveDe.get(im.id)) chaveDe.set(im.id, comChave);
+  }
+  estado.chavePredio = chaveDe;
+}
+
+// Info de transação recente do prédio de um imóvel, ou null.
+function transDoImovel(im) {
+  const chave = estado.chavePredio.get(im.id);
+  return chave ? (estado.transacoesPorPredio.get(chave) || null) : null;
+}
+
 // ---------- ações do topo (excel / export / import) ----------
 function ligarAcoes() {
   document.getElementById("chk-zero").addEventListener("change", render);
   document.getElementById("btn-excel").addEventListener("click", () => {
     const lista = ordenar(filtrar());
+    // info de transação por imóvel para a coluna do Excel (respeita o filtro atual)
+    const transInfo = {};
+    for (const im of lista) {
+      const t = transDoImovel(im);
+      if (t) transInfo[im.id] = t;
+    }
     // marca duplicados sobre a mesma lista exportada (respeita o filtro atual)
-    baixarExcel(lista, Anotacoes.todas(), analisarDuplicados(lista).info);
+    baixarExcel(lista, Anotacoes.todas(), analisarDuplicados(lista).info, transInfo);
   });
   document.getElementById("btn-exportar").addEventListener("click", () => Anotacoes.exportar());
   document.getElementById("input-importar").addEventListener("change", async (ev) => {
@@ -167,6 +232,7 @@ function filtrosAtuais() {
     tipo: document.getElementById("f-tipo").value || null,
     scoreMin: valNum("f-score"),
     visitado: document.getElementById("f-visitado").value || null,
+    soTrans: document.getElementById("f-trans").checked,
     fontes,
   };
 }
@@ -191,6 +257,7 @@ function filtrar() {
     (f.pm2Min === null || i.preco_m2 >= f.pm2Min) &&
     (f.pm2Max === null || i.preco_m2 <= f.pm2Max) &&
     (f.suitesMin === null || (i.suites ?? 0) >= f.suitesMin) &&
+    (!f.soTrans || transDoImovel(i) != null) &&
     filtroExtra(i, f)
   );
 }
@@ -206,6 +273,7 @@ function ligarFiltros() {
     document.getElementById("f-tipo").value = "";
     document.getElementById("f-score").value = "";
     document.getElementById("f-visitado").value = "";
+    document.getElementById("f-trans").checked = false;
     document.dispatchEvent(new CustomEvent("dashboard:limpar"));
     render();
   });
@@ -213,6 +281,9 @@ function ligarFiltros() {
 
 // ---------- render ----------
 function render() {
+  // recomputa as chaves de prédio antes de filtrar (anotações podem ter mudado
+  // o endereço de fallback via editor/import), para filtro e marca baterem
+  recomputarChavesPredio();
   const visiveis = filtrar();
   // uma única análise de duplicados por render, sobre o conjunto visível —
   // KPIs, scatter e tabela partem exatamente do mesmo resultado
@@ -353,17 +424,31 @@ function renderScatter(vis, dup) {
   wrap.appendChild(svg);
 }
 
+// Selo (link) para o prédio que teve transação recente de ITBI. Aponta para o
+// dashboard de transações já filtrado pelo logradouro do prédio.
+function seloTransacao(im) {
+  const info = transDoImovel(im);
+  if (!info) return "";
+  const chave = estado.chavePredio.get(im.id);
+  const [core, num] = chave.split("#");
+  const href = `transacoes.html?rua=${encodeURIComponent(core)}&num=${encodeURIComponent(num)}`;
+  const titulo = `Prédio com ${info.qtde} transação(ões) residencial(is) de compra e venda (ITBI) em ${info.anos.join("/")} — clique para ver as transações`;
+  return ` <a class="selo-trans" href="${href}" title="${escapeHtml(titulo)}">🧾 transação ${info.anos.join("/")}</a>`;
+}
+
 // ---------- tooltip ----------
 const tooltip = () => document.getElementById("tooltip");
 
 function mostrarTooltip(ev, im) {
   const t = tooltip();
+  const info = transDoImovel(im);
   t.innerHTML = `
     <div class="t-titulo">${escapeHtml(im.titulo)}</div>
     <div class="t-linha">${FONTES[im.fonte].rotulo} · ${escapeHtml(im.tipo)}</div>
     <div class="t-linha">${fmtM2.format(im.area_util_m2)} m² · ${fmtBRL.format(im.preco)} · ${fmtBRL.format(im.preco_m2)}/m²</div>
     <div class="t-linha">${im.dormitorios ?? "?"} dorm · ${im.suites ?? "?"} suítes · ${im.vagas ?? "?"} vagas</div>
-    <div class="t-linha">cond. ${im.condominio != null ? fmtBRL.format(im.condominio) : "—"} · IPTU ${im.iptu != null ? fmtBRL.format(im.iptu) : "—"}</div>`;
+    <div class="t-linha">cond. ${im.condominio != null ? fmtBRL.format(im.condominio) : "—"} · IPTU ${im.iptu != null ? fmtBRL.format(im.iptu) : "—"}</div>
+    ${info ? `<div class="t-linha">🧾 prédio c/ ${info.qtde} transação(ões) resid. de compra e venda em ${info.anos.join("/")}</div>` : ""}`;
   t.hidden = false;
   const margem = 14;
   let px = ev.clientX + margem, py = ev.clientY + margem;
@@ -419,11 +504,12 @@ function renderTabela(vis, analise) {
     const selo = dup
       ? `<span class="selo-dup" title="Mesma área e preço em outra fonte — contado uma vez nos KPIs">↔ também em ${dup.fontesIrmas.map((f) => FONTES[f].rotulo).join(", ")}</span>`
       : "";
+    const seloTrans = seloTransacao(im);
     const linha = `
     <tr data-id="${escapeHtml(im.id)}"${classes ? ` class="${classes}"` : ""}>
       <td><span class="fonte-tag"><span class="dot" style="background:${FONTES[im.fonte].cor}"></span>${FONTES[im.fonte].rotulo}</span></td>
       <td>${escapeHtml(im.tipo)}</td>
-      <td class="col-titulo"><a class="titulo-link" href="${escapeHtml(im.url)}" target="_blank" rel="noopener">${escapeHtml(im.titulo)}</a>${selo}${im.endereco ? `<br><span class="rodape">${escapeHtml(im.endereco)}</span>` : ""}${a?.endereco_completo ? `<br><span class="rodape">📍 ${escapeHtml(a.endereco_completo)}</span>` : ""}${a?.comentario ? `<br><span class="rodape comentario">💬 ${escapeHtml(a.comentario)}</span>` : ""}</td>
+      <td class="col-titulo"><a class="titulo-link" href="${escapeHtml(im.url)}" target="_blank" rel="noopener">${escapeHtml(im.titulo)}</a>${selo}${seloTrans}${im.endereco ? `<br><span class="rodape">${escapeHtml(im.endereco)}</span>` : ""}${a?.endereco_completo ? `<br><span class="rodape">📍 ${escapeHtml(a.endereco_completo)}</span>` : ""}${a?.comentario ? `<br><span class="rodape comentario">💬 ${escapeHtml(a.comentario)}</span>` : ""}</td>
       <td class="num">${fmtM2.format(im.area_util_m2)}</td>
       <td class="num">${fmtBRL.format(im.preco)}</td>
       <td class="num">${fmtBRL.format(im.preco_m2)}</td>

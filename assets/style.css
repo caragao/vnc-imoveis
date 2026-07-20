@@ -178,6 +178,34 @@ tr.dup td:first-child { box-shadow: inset 3px 0 0 var(--baseline); }
   border: 1px solid var(--baseline); border-radius: 999px; padding: 0 7px; white-space: nowrap;
 }
 
+/* ---------- conciliação entre dashboards (ADR-013) ---------- */
+/* selos de ligação: transação (🧾) no dashboard de venda; à venda (🏙️) no de transações */
+.selo-trans, .selo-venda {
+  display: inline-block; margin-left: 6px; font-size: 11px; white-space: nowrap;
+  border: 1px solid var(--serie-vnc); color: var(--serie-vnc); background: transparent;
+  border-radius: 999px; padding: 0 7px; text-decoration: none;
+}
+.selo-trans:hover, .selo-venda:hover { background: var(--hover-wash); }
+/* input inline de área útil na tabela de transações */
+.col-areautil { width: 92px; }
+.au-input {
+  width: 82px; padding: 3px 6px; border: 1px solid var(--baseline); border-radius: 6px;
+  background: var(--surface-1); color: var(--ink-1); font: inherit; font-size: 12px; text-align: right;
+}
+.au-input::placeholder { color: var(--muted); font-style: italic; }
+.au-input:focus { outline: none; border-color: var(--serie-vnc); }
+/* marca de valor derivado de área útil de referência (aproximado) */
+.tag-ref {
+  font-size: 10px; color: var(--muted); border: 1px solid var(--baseline);
+  border-radius: 999px; padding: 0 5px; vertical-align: middle;
+}
+/* chip do filtro por prédio (deep-link vindo do dashboard de venda) */
+.predio-ativo {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  margin: 0 0 12px; padding: 8px 12px; font-size: 13px;
+  border: 1px solid var(--serie-vnc); border-radius: 8px; background: var(--plane);
+}
+
 /* ---------- anotações ---------- */
 .col-score { white-space: nowrap; }
 .score-btn {

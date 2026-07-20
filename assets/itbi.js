@@ -18,6 +18,10 @@ const estado = {
   transacoes: [],
   ordenacao: { col: "data", asc: false }, // mais recentes primeiro por padrão
   naturezaPadrao: "", // "1.Compra e venda" se existir — default de "mercado residencial"
+  // conciliação com a oferta (ADR-013): Map(chave de prédio -> {qtde, areas:[área útil]})
+  imoveisPorPredio: new Map(),
+  // filtro exato por prédio vindo do deep-link (?rua=&num=), ou null
+  predioURL: null,
 };
 
 // ---------- boot ----------
@@ -25,6 +29,11 @@ async function boot() {
   const resp = await fetch("data/transacoes.json");
   const dados = await resp.json();
   estado.transacoes = dados.transacoes;
+
+  // conciliação com a oferta (nunca fatal) + área útil informada pelo usuário
+  await carregarImoveis();
+  try { await AreaUtil.carregar(); } catch (e) { console.warn("área útil indisponível", e); }
+  decorarTransacoes();
 
   const per = dados.periodo;
   document.getElementById("atualizado-em").textContent =
@@ -39,11 +48,92 @@ async function boot() {
   popularSelects();
   ligarFiltros();
   ligarOrdenacao();
+  ligarAcoesAreas();
+  aplicarDeepLink();
   document.getElementById("chk-zero").addEventListener("change", render);
   document.getElementById("btn-excel").addEventListener("click", () =>
     baixarExcelTransacoes(ordenar(filtrar()))
   );
   render();
+}
+
+// ---------- conciliação com a oferta (ADR-013) ----------
+async function carregarImoveis() {
+  try {
+    const resp = await fetch("data/imoveis.json");
+    const dados = await resp.json();
+    // anotações (mesmo localStorage do dashboard de venda) dão o endereço de
+    // fallback dos anúncios sem endereço coletado (Anglo/PH15)
+    let anotacoes = {};
+    try { anotacoes = await Anotacoes.carregar(); } catch (e) { /* segue sem fallback */ }
+    const idx = Conciliacao.indexarPorPredio(
+      dados.imoveis || [],
+      (im) => Conciliacao.chaveImovel(im, anotacoes[im.id])
+    );
+    estado.imoveisPorPredio = new Map();
+    for (const [chave, arr] of idx) {
+      estado.imoveisPorPredio.set(chave, {
+        qtde: arr.length,
+        areas: arr.map((im) => im.area_util_m2).filter((a) => a > 0),
+      });
+    }
+  } catch (e) {
+    console.warn("oferta indisponível, seguindo sem conciliação", e);
+    estado.imoveisPorPredio = new Map();
+  }
+}
+
+// Anexa campos derivados a cada transação (sem tocar no JSON de origem):
+//   tem_venda / venda_qtde  — prédio tem anúncio ativo na oferta
+//   area_util_ref           — mediana das áreas úteis dos anúncios do prédio (só residencial)
+//   area_util_m2            — override manual (AreaUtil) OU a sugestão (ref.)
+//   area_util_fonte         — "manual" | "ref" | null
+//   valor_m2_util           — valor equivalente a 100% ÷ área útil (aproximado)
+// Recalculado no boot e sempre que o usuário edita/importa uma área útil.
+function decorarTransacoes() {
+  for (const t of estado.transacoes) {
+    const chave = Conciliacao.chaveTransacao(t);
+    const venda = chave ? estado.imoveisPorPredio.get(chave) : null;
+    t.tem_venda = !!venda;
+    t.venda_qtde = venda ? venda.qtde : 0;
+    // sugestão de área útil só faz sentido para unidades residenciais (não vaga/loja)
+    const ref = (venda && t.residencial && venda.areas.length) ? mediana(venda.areas) : null;
+    t.area_util_ref = ref;
+    const manual = AreaUtil.valor(t.id);
+    const au = manual != null ? manual : ref;
+    t.area_util_m2 = au != null ? au : null;
+    t.area_util_fonte = manual != null ? "manual" : (ref != null ? "ref" : null);
+    t.valor_m2_util = (au && au > 0) ? Math.round(t.valor_100pct / au) : null;
+  }
+}
+
+// ?rua=<core>&num=<n> vindos do dashboard de venda. Com número, filtra pelo
+// PRÉDIO EXATO (chave de prédio) — não só a rua — para o link de Afonso Braz 537
+// não trazer todos os números da Afonso Braz. Sem número, cai na busca por rua.
+function aplicarDeepLink() {
+  const p = new URLSearchParams(location.search);
+  const rua = p.get("rua");
+  const num = p.get("num");
+  const chave = Conciliacao.chaveEndereco(rua, num);
+  if (chave) estado.predioURL = chave;
+  else if (rua) document.getElementById("f-busca").value = rua;
+}
+
+function ligarAcoesAreas() {
+  document.getElementById("btn-exportar-areas").addEventListener("click", () => AreaUtil.exportar());
+  document.getElementById("input-importar-areas").addEventListener("change", async (ev) => {
+    const arq = ev.target.files[0];
+    if (!arq) return;
+    try {
+      const n = await AreaUtil.importar(arq);
+      decorarTransacoes();
+      render();
+      alert(`${n} áreas úteis importadas e mescladas.`);
+    } catch (e) {
+      alert("Falha ao importar: " + e.message);
+    }
+    ev.target.value = "";
+  });
 }
 
 function popularSelects() {
@@ -93,6 +183,7 @@ function filtrosAtuais() {
     accMin: valNum("f-acc-min"), accMax: valNum("f-acc-max"),
     busca: document.getElementById("f-busca").value.trim().toLowerCase(),
     so100: document.getElementById("f-100").checked,
+    soVenda: document.getElementById("f-venda").checked,
   };
 }
 
@@ -125,6 +216,8 @@ function filtrar() {
     (f.accMin === null || (t.acc ?? -1) >= f.accMin) &&
     (f.accMax === null || (t.acc ?? Infinity) <= f.accMax) &&
     (!f.so100 || t.proporcao >= 100) &&
+    (!f.soVenda || t.tem_venda) &&
+    (!estado.predioURL || Conciliacao.chaveTransacao(t) === estado.predioURL) &&
     casaBusca(t, f.busca)
   );
 }
@@ -137,6 +230,8 @@ function ligarFiltros() {
     document.querySelectorAll('.filtros input[type="number"]').forEach((el) => (el.value = ""));
     document.getElementById("f-busca").value = "";
     document.getElementById("f-100").checked = false;
+    document.getElementById("f-venda").checked = false;
+    estado.predioURL = null;
     document.getElementById("f-ano").value = "";
     document.getElementById("f-natureza").value = estado.naturezaPadrao;
     document.getElementById("f-uso").value = "residencial";
@@ -147,10 +242,27 @@ function ligarFiltros() {
 
 // ---------- render ----------
 function render() {
+  renderPredioAtivo();
   const vis = filtrar();
   renderKpis(vis);
   renderScatter(vis);
   renderTabela(vis);
+}
+
+// chip do filtro por prédio (deep-link): mostra qual prédio está isolado e um
+// botão para limpar — senão o filtro exato ficaria invisível para o usuário.
+function renderPredioAtivo() {
+  const el = document.getElementById("predio-ativo");
+  if (!el) return;
+  if (!estado.predioURL) { el.hidden = true; el.innerHTML = ""; return; }
+  const [core, num] = estado.predioURL.split("#");
+  el.hidden = false;
+  el.innerHTML = `<span>Prédio: <strong>${escapeHtml(core)}, ${escapeHtml(num)}</strong></span>` +
+    `<button type="button" class="acao" id="predio-limpar">✕ limpar prédio</button>`;
+  el.querySelector("#predio-limpar").addEventListener("click", () => {
+    estado.predioURL = null;
+    render();
+  });
 }
 
 function mediana(nums) {
@@ -385,21 +497,46 @@ function renderTabela(vis) {
 
   corpo.innerHTML = ordenados.map((t) => {
     const parcial = t.proporcao < 100;
+    const seloV = t.tem_venda
+      ? ` <a class="selo-venda" href="index.html" title="${escapeHtml(t.venda_qtde + " imóvel(is) à venda neste prédio (ver dashboard de imóveis)")}">🏙️ à venda (${t.venda_qtde})</a>`
+      : "";
+    const ref = t.area_util_ref;
+    const manual = AreaUtil.valor(t.id);
+    const ph = ref != null ? fmtNum.format(Math.round(ref)) + " ref." : "";
+    const tituloAU = ref != null
+      ? `Sugestão do prédio (mediana dos anúncios): ${fmtM2.format(ref)} m². Digite para corrigir; vazio volta à sugestão.`
+      : "Sem anúncio conciliado — informe a área útil (fica só no seu navegador).";
     return `
     <tr${parcial ? ' class="dup"' : ""}>
       <td class="num">${fmtData(t.data)}</td>
-      <td class="col-titulo">${escapeHtml(t.endereco)}${t.cep ? `<br><span class="rodape">${escapeHtml(t.cep)}</span>` : ""}</td>
+      <td class="col-titulo">${escapeHtml(t.endereco)}${seloV}${t.cep ? `<br><span class="rodape">${escapeHtml(t.cep)}</span>` : ""}</td>
       <td>${escapeHtml(t.referencia || "—")}</td>
       <td>${escapeHtml(t.natureza)}</td>
       <td class="num">${fmtBRL.format(t.valor)}</td>
       <td class="num">${parcial ? `<span class="selo-dup" title="Transferência parcial — fora dos KPIs; R$/m² usa o valor equivalente a 100% (extrapolado)">${fmtPct.format(t.proporcao)}%</span>` : "100%"}</td>
       <td class="num">${t.area_construida_m2 != null ? fmtM2.format(t.area_construida_m2) : "—"}</td>
       <td class="num">${t.valor_m2 != null ? fmtBRL.format(t.valor_m2) : "—"}</td>
+      <td class="num col-areautil">
+        <input type="number" class="au-input" data-id="${escapeHtml(t.id)}" min="0" step="0.01" inputmode="decimal"
+          value="${manual != null ? manual : ""}" placeholder="${escapeHtml(ph)}" title="${escapeHtml(tituloAU)}" aria-label="área útil (m²)">
+      </td>
+      <td class="num">${t.valor_m2_util != null
+        ? `<span title="R$/m² sobre a área útil (aproximado)${t.area_util_fonte === "ref" ? " — área útil de referência do prédio" : ""}">~${fmtBRL.format(t.valor_m2_util)}${t.area_util_fonte === "ref" ? ' <span class="tag-ref">ref.</span>' : ""}</span>`
+        : "—"}</td>
       <td>${escapeHtml(t.descricao_uso || "—")}</td>
       <td>${escapeHtml(t.descricao_padrao || "—")}</td>
       <td class="num">${t.acc ?? "—"}</td>
     </tr>`;
   }).join("");
+
+  // editor inline de área útil: commit no blur/enter (change), sem re-render por tecla
+  corpo.querySelectorAll(".au-input").forEach((inp) =>
+    inp.addEventListener("change", () => {
+      AreaUtil.salvar(inp.dataset.id, inp.value);
+      decorarTransacoes();
+      render();
+    })
+  );
 
   document.getElementById("rodape").textContent =
     `${vis.length} transações exibidas · ordenado por ${estado.ordenacao.col.replace("_", " ")} ` +

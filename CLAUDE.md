@@ -24,7 +24,8 @@ itbi/build.py   ──gera──▶  data/transacoes.json ──fetch──▶  
 - **Duas fontes de dados independentes**, cada uma com seu pipeline e sua página (ADR-011):
   - `data/imoveis.json` (oferta) — só `scraper/run.py` escreve. Envelope `{"atualizado_em", "imoveis": [...]}`. Página `index.html`.
   - `data/transacoes.json` (transações fechadas via ITBI) — só `itbi/build.py` escreve. Envelope `{"atualizado_em", "fonte", "periodo", "total", "transacoes": [...]}`. Página `transacoes.html`. Ver `docs/ITBI.md`.
-  - Anotações do usuário — **somente localStorage** + export/import manual (ADR-008). Só no dashboard de imóveis. **O scraper nunca toca em anotações.**
+  - Anotações do usuário (imóveis) e áreas úteis manuais (transações) — **somente localStorage** + export/import manual (ADR-008/013). **Nenhum pipeline Python toca nesses dados.**
+- **Conciliação entre as duas páginas (ADR-013): client-side, em runtime.** `assets/conciliacao.js` (módulo puro compartilhado) liga transação e anúncio por **chave de prédio** (`logradouro normalizado + número`). Cada página busca **os dois** JSONs (fetch não-fatal): venda marca prédios com transação **residencial de compra e venda** 2025/2026 (mesmo mercado do default do painel de transações — ADR-012 — para os dois baterem; propaga pelos grupos de dup entre fontes); transações marcam "à venda" e sugerem área útil (mediana dos anúncios do prédio) + override manual em `assets/area-util.js`. **Nada é gravado nos JSONs** — não quebrar o escritor único nem tentar conciliar no build Python.
 - **Planilhas brutas de ITBI (`itbi/raw/*.xlsx`, ~65 MB) NUNCA são commitadas** (`.gitignore`) — atualizadas mensalmente pela Prefeitura; só o `data/transacoes.json` derivado entra no repo (ADR-011).
 - **PRIVACIDADE (ADR-008): o repo e o Pages são públicos.** Anotações pessoais (endereço, comentários, score, visitado) **nunca podem ser commitadas** — `data/anotacoes.json` está no `.gitignore` e não existe fetch dele no código. Não criar nenhum fluxo que incentive commitar esses dados; só `data/anotacoes.example.json` (fictício) é versionado.
 - Schema do imóvel validado por Pydantic em `scraper/models.py`. `id` = `{fonte}-{código do anúncio}` (estável entre execuções).
@@ -45,6 +46,7 @@ python validate_data.py       # relatório + validação de schema
 # testes
 python -m unittest discover tests          # em scraper/ e em itbi/
 node tests/js/anotacoes.test.js            # na raiz
+node tests/js/conciliacao.test.js          # conciliação por prédio + área útil (ADR-013)
 
 # dashboard local (serve index.html e transacoes.html)
 python -m http.server 8000   # na raiz do repo

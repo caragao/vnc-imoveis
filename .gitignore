@@ -17,8 +17,10 @@ Thumbs.db
 *.log
 tmp/
 
-# anotações pessoais NUNCA são commitadas (repo público — ADR-008)
+# anotações pessoais e áreas úteis manuais NUNCA são commitadas (repo público — ADR-008/013);
+# vivem só no localStorage + export/import local, nunca há fetch delas no código
 data/anotacoes.json
+data/areas-uteis.json
 
 # planilhas brutas de ITBI da Prefeitura (~65 MB, atualizadas mensalmente) —
 # nunca commitadas; só o JSON derivado data/transacoes.json entra no repo (ADR-011)
