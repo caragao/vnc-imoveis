@@ -2,11 +2,13 @@
    Usa SheetJS vendorizado em assets/vendor/xlsx.min.js (sem CDN). */
 "use strict";
 
-function baixarExcel(imoveis, anotacoes, dupInfo) {
+function baixarExcel(imoveis, anotacoes, dupInfo, transInfo) {
   dupInfo = dupInfo || {};
+  transInfo = transInfo || {};
   const linhas = imoveis.map((im) => {
     const a = anotacoes[im.id] || {};
     const dup = dupInfo[im.id];
+    const tr = transInfo[im.id];
     return {
       "Fonte": im.fonte,
       "Tipo": im.tipo,
@@ -20,6 +22,7 @@ function baixarExcel(imoveis, anotacoes, dupInfo) {
       "Condomínio (R$)": im.condominio ?? "",
       "IPTU (R$)": im.iptu ?? "",
       "Duplicado": dup ? "sim" : "",
+      "Transação 25/26 no prédio": tr ? `sim (${tr.qtde} em ${tr.anos.join("/")})` : "",
       "Endereço (site)": im.endereco || "",
       "Endereço completo (meu)": a.endereco_completo || "",
       "Comentário": a.comentario || "",
@@ -34,7 +37,7 @@ function baixarExcel(imoveis, anotacoes, dupInfo) {
   ws["!cols"] = [
     { wch: 8 }, { wch: 14 }, { wch: 40 }, { wch: 12 }, { wch: 14 }, { wch: 10 },
     { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 14 }, { wch: 12 }, { wch: 9 },
-    { wch: 28 }, { wch: 28 }, { wch: 40 }, { wch: 6 }, { wch: 8 }, { wch: 50 }, { wch: 12 },
+    { wch: 22 }, { wch: 28 }, { wch: 28 }, { wch: 40 }, { wch: 6 }, { wch: 8 }, { wch: 50 }, { wch: 12 },
   ];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Imóveis VNC");

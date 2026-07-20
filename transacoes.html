@@ -16,6 +16,9 @@
   </div>
   <div class="topo-acoes" id="topo-acoes">
     <button class="acao acao-primaria" id="btn-excel" type="button">⬇ Baixar Excel</button>
+    <button class="acao" id="btn-exportar-areas" type="button">Exportar áreas úteis</button>
+    <label class="acao" for="input-importar-areas">Importar áreas úteis</label>
+    <input type="file" id="input-importar-areas" accept=".json,application/json" hidden>
   </div>
 </header>
 
@@ -78,6 +81,9 @@
   <div class="filtro">
     <label class="chk-eixo" for="f-100"><input type="checkbox" id="f-100"> só proporção 100%</label>
   </div>
+  <div class="filtro">
+    <label class="chk-eixo" for="f-venda"><input type="checkbox" id="f-venda"> só prédios c/ imóvel à venda</label>
+  </div>
   <button class="limpar" id="btn-limpar" type="button">Limpar filtros</button>
 </section>
 
@@ -106,8 +112,10 @@
         <th data-col="natureza">Natureza</th>
         <th data-col="valor" class="num">Valor</th>
         <th data-col="proporcao" class="num">Prop.</th>
-        <th data-col="area_construida_m2" class="num">Área m²</th>
-        <th data-col="valor_m2" class="num">R$/m²</th>
+        <th data-col="area_construida_m2" class="num">Área constr. m²</th>
+        <th data-col="valor_m2" class="num">R$/m² constr.</th>
+        <th data-col="area_util_m2" class="num">Área útil m²</th>
+        <th data-col="valor_m2_util" class="num">R$/m² útil</th>
         <th data-col="descricao_uso">Uso (IPTU)</th>
         <th data-col="descricao_padrao">Padrão</th>
         <th data-col="acc" class="num">ACC</th>
@@ -131,7 +139,9 @@
         <li><strong>Proporção ausente:</strong> quando a planilha não traz a proporção, assume-se 100% (a transação é tratada como integral). A auditoria do <code>build.py</code> conta quantos registros receberam esse default.</li>
         <li><strong>R$/m²:</strong> usa a <em>área construída</em> (IPTU). ~18% das linhas não têm área (terrenos/cadastro incompleto) e ficam sem R$/m² e fora do gráfico. Raros cadastros prediais (área do prédio inteiro) são cortados do gráfico pela rede de segurança de escala.</li>
         <li><strong>Ano:</strong> vem da <em>data de transação</em> (celebração do instrumento), não do mês de pagamento da guia.</li>
-        <li><strong>Comparação com anúncios (oferta):</strong> este painel <em>não</em> compara diretamente com o dashboard de imóveis à venda. Uma comparação defensável exigiria controlar por área, tipo, localização fina, idade, padrão, período e vagas — ver docs/ITBI.md.</li>
+        <li><strong>Área útil e R$/m² útil (conciliação com a oferta):</strong> a área construída (IPTU) inclui garagem e áreas comuns; a área <em>útil</em> (privativa) vem dos anúncios à venda no <em>mesmo prédio</em> (conciliação por logradouro + número — ADR-013). Como os anúncios não trazem o número do apartamento, <strong>não</strong> é possível casar a transação com a unidade exata: a área útil sugerida é a <strong>mediana do prédio</strong> (marcada como <em>ref.</em>) — uma <em>aproximação</em>. Onde não há anúncio conciliado, ou para corrigir a sugestão, informe a área útil manualmente (fica só no seu navegador, exportável). O <strong>R$/m² útil</strong> (marcado com <code>~</code>) usa <code>valor equivalente a 100% ÷ área útil</code>.</li>
+        <li><strong>Imóvel à venda no prédio:</strong> o selo 🏙️ marca transações cujo prédio tem anúncio ativo no dashboard de imóveis. Não implica que a unidade transacionada seja a mesma anunciada.</li>
+        <li><strong>Comparação com anúncios (oferta):</strong> fora a conciliação de área acima, este painel <em>não</em> compara preços diretamente com o dashboard de imóveis à venda. Uma comparação de preço defensável exigiria controlar por área, tipo, localização fina, idade, padrão, período e vagas — ver docs/ITBI.md.</li>
       </ul>
     </div>
   </details>
@@ -140,6 +150,9 @@
 <div class="tooltip" id="tooltip" hidden></div>
 
 <script src="assets/vendor/xlsx.min.js"></script>
+<script src="assets/anotacoes.js"></script>
+<script src="assets/conciliacao.js"></script>
+<script src="assets/area-util.js"></script>
 <script src="assets/itbi-excel.js?v=2"></script>
 <script src="assets/itbi.js?v=2"></script>
 </body>

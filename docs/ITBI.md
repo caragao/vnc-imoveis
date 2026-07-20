@@ -114,6 +114,16 @@ extra corta pelo p98 os raros cadastros **prediais** (uso 21: área = prédio in
 `area_construida_m2 = null` e `valor_m2 = null`: aparecem na tabela, mas **fora do gráfico e da
 mediana de R$/m²**.
 
+## Conciliação com a oferta e área útil (ADR-013)
+
+O ITBI traz **área construída** (IPTU, inclui garagem/áreas comuns), não a **área útil** (privativa) usada no dashboard de imóveis. Para aproximar as duas, `assets/conciliacao.js` liga transação e anúncio **pelo prédio** (`logradouro normalizado + número`), 100% no navegador — nada é gravado em `transacoes.json`.
+
+- **Selo 🏙️ "à venda":** transações cujo prédio tem anúncio ativo na oferta (`data/imoveis.json`, buscado pela própria página). Filtro "só prédios c/ imóvel à venda".
+- **Área útil (aproximada):** os anúncios **não têm número de apartamento**, então não dá para casar a transação com a unidade exata — só com o prédio. A coluna "Área útil" é preenchida com a **mediana da área útil dos anúncios do prédio** (só para transações residenciais), marcada como *ref.*; o **R$/m² útil** (marcado com `~`) = `valor equivalente a 100% ÷ área útil`.
+- **Override manual:** o usuário pode digitar a área útil real por transação (útil onde não há anúncio conciliado ou para corrigir a referência). Fica em **localStorage** (`assets/area-util.js`, chave `vnc-imoveis:areautil`) + export/import — **nunca** no repo. Isso amenda a decisão do ADR-011 de "sem camada de anotações" nesta página.
+
+Continua valendo: **não** há comparação direta de **preço** oferta×realizado (exigiria controlar por área/tipo/idade/padrão/período/vagas). A conciliação acima é só de localização e área.
+
 ## Escopo e resiliência
 
 - Só **Vila Nova Conceição** (ADR-005 estende-se aqui). O default do dashboard mostra o grupo
