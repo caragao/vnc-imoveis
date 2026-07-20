@@ -47,9 +47,11 @@ _RUAS_NAO_VNC = (
     "JOAO CACHOEIRA", "CLODOMIRO AMAZONAS", "EDUARDO DE SOUZA ARANHA", "FADLO HAIDAR",
     "GUILHERME BANNITZ", "ATILIO INNOCENTI", "JUSCELINO KUBITSCHEK", "MIGUEL CALFAT",
     "ALCEU DE CAMPOS RODRIGUES", "JOAQUIM FERREIRA LOBO", "FERNANDES DE ABREU",
-    # Moema / Indianópolis (nomes de ave e adjacências) — dividem CEP com VNC
+    # Moema / Indianópolis (nomes de ave e adjacências) — dividem CEP com VNC.
+    # Av. Lavandisca (também nome de ave) é de Moema, não de VNC: as referências
+    # dos anúncios trazem "COND VISO MOEMA"/"ARTISAN MOEMA".
     "SABIA", "PINTASSILGO", "TUIM", "JACUTINGA", "GRAUNA", "PERIQUITO", "ARAGUARI",
-    "REPUBLICA DO LIBANO",
+    "REPUBLICA DO LIBANO", "LAVANDISCA",
     # Arterial de divisa: Av. Santo Amaro atravessa VNC/Indianópolis/Vila Olímpia
     # e mistura os três no MESMO CEP (04505) — não dá p/ resolver por CEP+rua, e a
     # testada de VNC é mínima. Excluída inteira (ADR-012); frontais de VNC caem nos

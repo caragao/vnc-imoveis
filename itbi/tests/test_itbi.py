@@ -124,6 +124,8 @@ class TestNovaTransacao(unittest.TestCase):
         self.assertEqual(novo(**{**self.BASE, "uso": 85}).tipo_ativo, "Flat comercial")
         self.assertEqual(novo(**{**self.BASE, "uso": 0}).tipo_ativo, "Terreno")
         self.assertEqual(novo(**{**self.BASE, "uso": None}).tipo_ativo, "Não classificado")
+        # código fora da tabela oficial (0-85) fica identificável, não some em "Outro"
+        self.assertEqual(novo(**{**self.BASE, "uso": 91}).tipo_ativo, "Outro (uso 91)")
         # hotel e flat comercial NÃO são unidade residencial de mercado
         self.assertFalse(novo(**{**self.BASE, "uso": 80}).residencial)
         self.assertFalse(novo(**{**self.BASE, "uso": 85}).residencial)
@@ -142,6 +144,10 @@ class TestRuaBloqueada(unittest.TestCase):
         for rua in ["R JOAO CACHOEIRA", "R CLODOMIRO AMAZONAS",
                     "R DR EDUARDO DE SOUZA ARANHA", "R DR FADLO HAIDAR",
                     "AV PRES JUSCELINO KUBITSCHEK", "AV STO AMARO"]:  # arterial de divisa
+            self.assertTrue(rua_bloqueada(rua), f"deveria bloquear {rua}")
+
+    def test_ruas_de_moema_bloqueadas(self):
+        for rua in ["AV SABIA", "R PINTASSILGO", "AV LAVANDISCA"]:  # nomes de ave = Moema
             self.assertTrue(rua_bloqueada(rua), f"deveria bloquear {rua}")
 
     def test_ruas_de_vnc_nao_bloqueadas(self):

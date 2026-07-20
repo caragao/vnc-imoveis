@@ -44,7 +44,9 @@ USOS_RESIDENCIAIS = {10, 20, 25}
 def tipo_ativo(uso: Optional[int]) -> str:
     if uso is None:
         return "Não classificado"
-    return TIPO_POR_USO.get(uso, "Outro")
+    # código presente na base mas fora da Tabela de USOS oficial (0–85): não
+    # inventar rótulo — expor o número p/ ser identificável e sinalizado no validador.
+    return TIPO_POR_USO.get(uso, f"Outro (uso {uso})")
 
 
 class Transacao(BaseModel):

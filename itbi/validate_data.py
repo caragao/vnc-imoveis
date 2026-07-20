@@ -60,6 +60,11 @@ def main():
     _cont("por ano (data de transação):", Counter(t["ano"] for t in linhas).items())
     _cont("por natureza:", Counter(t["natureza"] for t in linhas).items())
     _cont("por tipo de ativo (uso IPTU):", Counter(t.get("tipo_ativo") or "?" for t in linhas).items())
+    # sinaliza códigos de uso presentes na base mas fora da Tabela de USOS oficial
+    nao_map = Counter(t["uso"] for t in linhas
+                      if t.get("uso") is not None and t["uso"] not in models.TIPO_POR_USO)
+    if nao_map:
+        print(f"\n⚠ códigos de uso NÃO mapeados (revisar / atualizar TIPO_POR_USO): {dict(nao_map)}")
     _cont("por padrão (IPTU):", Counter(t.get("descricao_padrao") or "(sem padrão)" for t in linhas).items())
 
     # composição metodológica (P1.4): integral vs parcial, área, faixas de área
