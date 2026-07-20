@@ -6,17 +6,18 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from models import novo, USOS_RESIDENCIAIS  # noqa: E402
 from util import fmt_cep, is_vnc, normalizar, texto, inteiro  # noqa: E402
+from build import _proporcao  # noqa: E402
 
 
 class TestIsVnc(unittest.TestCase):
     def test_variantes_reais_de_vnc(self):
-        # rótulos + CEPs 045xxxxx que aparecem de verdade nas planilhas
+        # rótulos + CEPs reais de VNC (04505–04515) que aparecem nas planilhas
         for bairro, cep in [
             ("VILA NOVA CONCEICAO", 4505001),
             ("VL NOVA CONCEICAO", 4507010),
             ("V NOVA CONCEICAO", 4509021),
             ("V. NOVA CONCEICAO", 4513901),
-            ("VNCONCEICAO", 4540000),
+            ("VNCONCEICAO", 4515011),
         ]:
             self.assertTrue(is_vnc(bairro, cep), f"deveria aceitar {bairro} {cep}")
 
@@ -26,6 +27,14 @@ class TestIsVnc(unittest.TestCase):
         self.assertFalse(is_vnc("VL N SRA CONCEICAO", 5181000))  # Nossa Senhora
         self.assertFalse(is_vnc("SITIO CONCEICAO", 8473030))     # Sítio
         self.assertFalse(is_vnc("CJ HAB SITIO CONCEICAO", 8473090))
+
+    def test_vazamento_itaim_vila_olimpia_rejeitado(self):
+        # rótulo diz "Nova Conceição" mas o CEP (04522+) é Itaim/Vila Olímpia —
+        # endereços reais que vazavam com a faixa larga 045xxxxx
+        self.assertFalse(is_vnc("VL NOVA CONCEICAO", 4543000))  # Av. JK / Souza Aranha
+        self.assertFalse(is_vnc("VILA NOVA CONCEICAO", 4545000))  # Fadlo Haidar
+        self.assertFalse(is_vnc("V NOVA CONCEICAO", 4535000))   # João Cachoeira
+        self.assertFalse(is_vnc("VL NOVA CONCEICAO", 4532000))  # Guilherme Bannitz
 
     def test_cep_fora_da_faixa_rejeita_mesmo_com_rotulo_certo(self):
         # rótulo diz VNC mas CEP é de outro bairro -> rejeita (defesa dupla)
@@ -53,6 +62,23 @@ class TestNormalizacao(unittest.TestCase):
         self.assertEqual(inteiro("605994.39"), 605994)
         self.assertEqual(inteiro(100), 100)
         self.assertIsNone(inteiro(None))
+
+
+class TestProporcao(unittest.TestCase):
+    def test_valores_validos(self):
+        self.assertEqual(_proporcao(100), 100.0)
+        self.assertEqual(_proporcao(50), 50.0)
+        self.assertEqual(_proporcao(4.07), 4.07)
+
+    def test_ausente_ou_invalido_vira_100(self):
+        self.assertEqual(_proporcao(None), 100.0)
+        self.assertEqual(_proporcao(0), 100.0)
+        self.assertEqual(_proporcao(150), 100.0)
+        self.assertEqual(_proporcao("nao numero"), 100.0)
+
+    def test_nan_do_pandas_vira_100(self):
+        # célula Excel vazia chega como float('nan') — não pode ser descartada
+        self.assertEqual(_proporcao(float("nan")), 100.0)
 
 
 class TestNovaTransacao(unittest.TestCase):

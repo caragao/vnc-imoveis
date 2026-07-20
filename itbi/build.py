@@ -66,7 +66,9 @@ def _proporcao(v):
         n = float(v)
     except (ValueError, TypeError):
         n = None
-    if n is None or n <= 0 or n > 100:
+    # célula vazia vira float('nan') no pandas — não é None nem cai nas comparações
+    # de faixa (NaN <= 0 e NaN > 100 são ambos False); trata como ausente -> 100.
+    if n is None or n != n or n <= 0 or n > 100:
         return 100.0
     return round(n, 4)
 

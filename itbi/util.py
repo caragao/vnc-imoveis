@@ -28,15 +28,24 @@ def cep_int(cep) -> int | None:
         return None
 
 
+# faixa de CEP da Vila Nova Conceição de verdade: 04500-000 a 04515-999.
+# NÃO usar a faixa larga 045xxxxx: 04522+ já é Itaim Bibi/Vila Olímpia (Av. JK,
+# Dr. Eduardo de Souza Aranha, Fadlo Haidar, João Cachoeira...), que aparecem
+# rotulados como "Nova Conceição" na declaração e vazariam para os totais. O
+# corte em 04515 bate com a extensão real do bairro nos dados (ver docs/ITBI.md).
+CEP_VNC_MIN, CEP_VNC_MAX = 4500000, 4515999
+
+
 def is_vnc(bairro, cep) -> bool:
     """True só para Vila Nova Conceição de verdade.
 
     Dois sinais combinados: rótulo contém 'NOVA CONCEICAO' (ou 'VNCONCEICAO')
-    E o CEP cai na faixa 045xxxxx do bairro — o que exclui os homônimos, que
-    ficam em 0518x/0847x. Rejeita ainda os termos-armadilha por segurança."""
+    E o CEP cai na faixa real do bairro (04500–04515) — o que exclui tanto os
+    homônimos (Nossa Senhora 0518x, Sítio 0847x) quanto o vazamento de
+    Itaim/Vila Olímpia (04522+). Rejeita ainda os termos-armadilha por segurança."""
     b = normalizar(bairro)
     c = cep_int(cep)
-    cep_ok = c is not None and 4500000 <= c <= 4549999
+    cep_ok = c is not None and CEP_VNC_MIN <= c <= CEP_VNC_MAX
     tem_conceicao = "NOVA CONCEICAO" in b or "VNCONCEICAO" in b
     armadilha = any(t in b for t in _ARMADILHAS)
     return tem_conceicao and cep_ok and not armadilha

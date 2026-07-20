@@ -144,7 +144,7 @@ A análise é **recomputada a cada render sobre o conjunto visível** (uma chama
 **Decisão:** criar uma **segunda camada de dados independente**, reaproveitando os padrões dos ADR-002/003/007:
 - Pipeline Python em `itbi/` (irmão de `scraper/`): `build.py` lê os `.xlsx` brutos, filtra Vila Nova Conceição, normaliza via Pydantic (`itbi/models.py`) e grava `data/transacoes.json` (envelope `{atualizado_em, fonte, periodo, total, transacoes}`). `validate_data.py` reporta qualidade + valida schema.
 - Página estática nova `transacoes.html` + `assets/itbi.js` (+ `assets/itbi-excel.js`), espelhando o dashboard de imóveis: KPIs, scatter SVG (valor × área construída, cor por ano), tabela ordenável, filtros e download `.xlsx`. **Sem camada de anotações** (dado público, read-only). Navegação recíproca com `index.html`.
-- **Filtro VNC por CEP `045xxxxx` + rótulo**, não só pelo campo Bairro (que mistura Vila Nossa Senhora da Conceição e Sítio Conceição — ver docs/ITBI.md).
+- **Filtro VNC por CEP na faixa real do bairro (`04500`–`04515`) + rótulo**, não só pelo campo Bairro (que mistura Vila Nossa Senhora da Conceição e Sítio Conceição, e rotula como "Nova Conceição" endereços de Itaim/Vila Olímpia em `04522+` — ver docs/ITBI.md).
 - **Transferências parciais (proporção <100%, ~37%) ajustadas para 100%** (`valor ÷ proporção`) como métrica principal de R$/m²; coluna de proporção + filtro "só 100%".
 - **Ano da análise vem da Data de Transação**, não do mês de pagamento da guia.
 - Default do dashboard = **mercado residencial** (natureza "Compra e venda" + uso 10/20/21/25); tudo filtrável.

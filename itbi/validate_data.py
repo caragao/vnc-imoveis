@@ -43,9 +43,11 @@ def main():
     print(f"transações: {n}  ·  período {dados['periodo']['de']} a {dados['periodo']['ate']}")
     print(f"fonte: {dados['fonte']}")
 
-    # garantia do filtro: nenhum CEP fora da faixa 045xxxxx
-    fora = [t for t in linhas if t.get("cep") and not t["cep"].startswith("045")]
-    print(f"\nCEP fora de 045xxxxx (deveria ser 0): {len(fora)}")
+    # garantia do filtro: nenhum CEP fora da faixa real de VNC (04500–04515)
+    def _cep5(t):
+        return int((t.get("cep") or "0").replace("-", "")[:5] or 0)
+    fora = [t for t in linhas if t.get("cep") and not (4500 <= _cep5(t) <= 4515)]
+    print(f"\nCEP fora de 04500–04515 (deveria ser 0): {len(fora)}")
     for t in fora[:5]:
         print(f"  ! {t['cep']}  {t['bairro']}  {t['endereco']}")
 
